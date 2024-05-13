@@ -73,19 +73,15 @@ func main() {
 		cfg = &config{}
 	}
 
-	// Create mock CA. If no mock CA was specified in the configuration file,
-	// create a transient one.
-	var ca *mockca.MockCA
-	if cfg.MockCA != nil {
-		ca, err = mockca.NewFromFiles(cfg.MockCA.Certs, cfg.MockCA.Key)
+	// Create CA.
+	var ca *realca.RealCA
+	if cfg.RealCA != nil {
+		ca, err = ca.Load(cfg.RealCA.Certs, cfg.RealCA.Key)
 		if err != nil {
-			log.Fatalf("failed to create mock CA: %v", err)
+			log.Fatalf("failed to create CA: %v", err)
 		}
 	} else {
-		ca, err = mockca.NewTransient()
-		if err != nil {
-			log.Fatalf("failed to create mock CA: %v", err)
-		}
+		log.Fatalf("No CA defined in configuration file")
 	}
 
 	// Create logger. If no log file was specified, log to standard error.

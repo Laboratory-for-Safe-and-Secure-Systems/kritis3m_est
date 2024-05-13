@@ -8,7 +8,7 @@ import (
 
 // config contains the EST server configuration.
 type config struct {
-	RealCA              *RealCAConfig `json:"ca,omitempty"`
+	RealCA              *realCAConfig `json:"ca,omitempty"`
 	TLS                 *tlsConfig    `json:"tls,omitempty"`
 	AllowedHosts        []string      `json:"allowed_hosts,omitempty"`
 	HealthCheckPassword string        `json:"healthcheck_password"`
@@ -17,8 +17,8 @@ type config struct {
 	Logfile             string        `json:"log_file"`
 }
 
-// mockCAConfig contains the mock CA configuration.
-type mockCAConfig struct {
+// RealCAConfig contains the real CA configuration.
+type realCAConfig struct {
 	Certs string `json:"certificates"`
 	Key   string `json:"private_key"`
 }
