@@ -1,18 +1,3 @@
-/*
-Copyright (c) 2020 GMO GlobalSign, Inc.
-
-Licensed under the MIT License (the "License"); you may not use this file except
-in compliance with the License. You may obtain a copy of the License at
-
-https://opensource.org/licenses/MIT
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
@@ -23,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/url"
@@ -34,8 +18,8 @@ import (
 	"time"
 
 	"github.com/ThalesIgnite/crypto11"
-	"github.com/globalsign/est"
-	"golang.org/x/crypto/ssh/terminal"
+	"github.com/ayham/est"
+	"golang.org/x/term"
 
 	"github.com/globalsign/pemfile"
 	"github.com/globalsign/tpmkeys"
@@ -347,12 +331,12 @@ func (k *tpmKey) Get(baseDir string) (interface{}, func() error, error) {
 		}
 
 	case k.Storage != nil:
-		pub, err := ioutil.ReadFile(fullPath(baseDir, k.Public))
+		pub, err := os.ReadFile(fullPath(baseDir, k.Public))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read public area: %w", err)
 		}
 
-		priv, err := ioutil.ReadFile(fullPath(baseDir, k.Private))
+		priv, err := os.ReadFile(fullPath(baseDir, k.Private))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read private area: %w", err)
 		}
@@ -493,7 +477,7 @@ func newConfig(set *flag.FlagSet) (config, error) {
 		}
 
 		// Read the file and parse the configuration.
-		data, err := ioutil.ReadFile(filename)
+		data, err := os.ReadFile(filename)
 		if err != nil {
 			return config{}, fmt.Errorf("failed to open configuration file: %v", err)
 		}
@@ -640,7 +624,7 @@ func passwordFromTerminal(cred, target string) ([]byte, error) {
 	// use it if it is.
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
-		if !os.IsNotExist(err) || !terminal.IsTerminal(int(os.Stdin.Fd())) {
+		if !os.IsNotExist(err) || !term.IsTerminal(int(os.Stdin.Fd())) {
 			return nil, fmt.Errorf("failed to open terminal: %w", err)
 		}
 		tty = os.Stdin
@@ -649,7 +633,7 @@ func passwordFromTerminal(cred, target string) ([]byte, error) {
 	}
 
 	tty.Write([]byte(fmt.Sprintf("Enter %s for %s: ", cred, target)))
-	pass, err := terminal.ReadPassword(int(tty.Fd()))
+	pass, err := term.ReadPassword(int(tty.Fd()))
 	tty.Write([]byte("\n"))
 
 	if err != nil {

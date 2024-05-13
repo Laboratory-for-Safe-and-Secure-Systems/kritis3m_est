@@ -16,28 +16,20 @@ limitations under the License.
 package main
 
 import (
-	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
-	"github.com/globalsign/est"
-	"github.com/globalsign/est/internal/basiclogger"
-	"github.com/globalsign/est/internal/mockca"
+	"github.com/ayham/est"
+	"github.com/ayham/est/internal/basiclogger"
+	"github.com/ayham/est/internal/realca"
 	"github.com/globalsign/pemfile"
 )
 
@@ -110,10 +102,7 @@ func main() {
 	}
 
 	// Create server TLS configuration. If a server TLS configuration was
-	// specified in the configuration file, use it. Otherwise, generate a
-	// transient server key and enroll for a server certificate with the
-	// mock CA, and use the CA certificates as the client CA certificates
-	// also.
+	// specified in the configuration file, use it.
 	var listenAddr = defaultListenAddr
 	var serverKey interface{}
 	var serverCerts []*x509.Certificate
@@ -140,43 +129,7 @@ func main() {
 
 		listenAddr = cfg.TLS.ListenAddr
 	} else {
-		serverKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		if err != nil {
-			log.Fatalf("failed to generate server private key: %v", err)
-		}
-
-		tmpl := &x509.CertificateRequest{
-			Subject:     pkix.Name{CommonName: "Testing Non-Production EST Server"},
-			DNSNames:    []string{"localhost"},
-			IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
-		}
-
-		der, err := x509.CreateCertificateRequest(rand.Reader, tmpl, serverKey)
-		if err != nil {
-			log.Fatalf("failed to generate server certificate signing request: %v", err)
-		}
-
-		csr, err := x509.ParseCertificateRequest(der)
-		if err != nil {
-			log.Fatalf("failed to parse server certificate signing request: %v", err)
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-
-		cert, err := ca.Enroll(ctx, csr, "", nil)
-		if err != nil {
-			log.Fatalf("failed to enroll for server certificate: %v", err)
-		}
-
-		cacerts, err := ca.CACerts(ctx, "", nil)
-		if err != nil {
-			log.Fatalf("failed to retrieve CA certificates: %v", err)
-		}
-
-		cancel()
-
-		serverCerts = append([]*x509.Certificate{cert}, cacerts...)
-		clientCACerts = []*x509.Certificate{cacerts[len(cacerts)-1]}
+		log.Fatalf("No TLS configuration defined in configuration file")
 	}
 
 	var tlsCerts [][]byte
@@ -203,31 +156,13 @@ func main() {
 		ClientCAs: clientCAs,
 	}
 
-	// Create a password function which requires a HTTP Basic Authentication
-	// username of "healthcheck" and the password from the configuration (no
-	// password if no configuration was provided) to access the /healthcheck
-	// endpoint, and no username or password otherwise required.
-	pwfunc := func(ctx context.Context, r *http.Request, aps, username, password string) error {
-		if strings.ToLower(r.URL.Path) != healthCheckEndpoint {
-			return nil
-		}
-
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != healthCheckUsername || pass != cfg.HealthCheckPassword {
-			return errors.New("authorization required")
-		}
-
-		return nil
-	}
-
 	// Create server mux.
 	r, err := est.NewRouter(&est.ServerConfig{
-		CA:             ca,
-		Logger:         logger,
-		AllowedHosts:   cfg.AllowedHosts,
-		Timeout:        time.Duration(cfg.Timeout) * time.Second,
-		RateLimit:      cfg.RateLimit,
-		CheckBasicAuth: pwfunc,
+		CA:           ca,
+		Logger:       logger,
+		AllowedHosts: cfg.AllowedHosts,
+		Timeout:      time.Duration(cfg.Timeout) * time.Second,
+		RateLimit:    cfg.RateLimit,
 	})
 	if err != nil {
 		log.Fatalf("failed to create new EST router: %v", err)
@@ -243,7 +178,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
-	logger.Infof("Starting EST server FOR NON-PRODUCTION USE ONLY")
+	logger.Infof("Starting EST server")
 
 	go s.ListenAndServeTLS("", "")
 

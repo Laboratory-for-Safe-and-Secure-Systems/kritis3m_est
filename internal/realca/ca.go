@@ -1,53 +1,38 @@
+package realca
+
 /*
-Copyright (c) 2020 GMO GlobalSign, Inc.
-
-Licensed under the MIT License (the "License"); you may not use this file except
-in compliance with the License. You may obtain a copy of the License at
-
-https://opensource.org/licenses/MIT
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+#cgo CFLAGS: -I../../include/kritis3m_pki -I../../include/liboqs -I../../include/oqs -I../../include
+#cgo LDFLAGS: -L../../lib -lkritis3m_pki
+#include "common.h"
 */
-
-package mockca
-
+import "C"
 import (
 	"context"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"net/http"
 	"strconv"
 	"time"
 
-	"go.mozilla.org/pkcs7"
-
-	"github.com/globalsign/pemfile"
-
 	"github.com/ayham/est"
 	"github.com/ayham/est/internal/tpm"
+	"github.com/globalsign/pemfile"
+	"go.mozilla.org/pkcs7"
 )
 
-// MockCA is a mock, non-production certificate authority useful for testing
-// purposes only.
-type MockCA struct {
-	certs []*x509.Certificate
-	key   interface{}
-}
+// Global variables.
+var (
+	oidSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
+)
 
 // Global constants.
 const (
@@ -60,20 +45,102 @@ const (
 	triggerErrorsAPS           = "triggererrors"
 )
 
-// Global variables.
-var (
-	oidSubjectAltName = asn1.ObjectIdentifier{2, 5, 29, 17}
+const (
+	pkcs8PrivateKeyPEMType = "PRIVATE KEY"
+	pkcs1PrivateKeyPEMType = "RSA PRIVATE KEY"
+	ecPrivateKeyPEMType    = "EC PRIVATE KEY"
+	pkixPublicKeyPEMType   = "PUBLIC KEY"
+	pkcs1PublicKeyPEMType  = "RSA PUBLIC KEY"
 )
 
-func init() {
-	// Set default content encryption algorithm for PKCS7 package, which
-	// otherwise defaults to 3DES.
-	pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES128GCM
+// RealCA is a simple CA implementation that uses a single key pair and
+// certificate to sign requests.
+// It uses Root 1 Intermediate 2 Entity hierarchy.
+type RealCA struct {
+	certs []*x509.Certificate
+	key   interface{}
+	pqKey interface{}
+}
+
+// New creates a new mock certificate authority. If more than one CA certificate
+// is provided, they should be in order with the issuing (intermediate) CA
+// certificate first, and the root CA certificate last. The private key should
+// be associated with the public key in the first, issuing CA certificate.
+func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
+	if len(cacerts) < 1 {
+		return nil, errors.New("no CA certificates provided")
+	} else if key == nil {
+		return nil, errors.New("no private key provided")
+	}
+
+	for i := range cacerts {
+		if !cacerts[i].IsCA {
+			return nil, fmt.Errorf("certificate at index %d is not a CA certificate", i)
+		}
+	}
+
+	return &RealCA{
+		certs: cacerts,
+		key:   key,
+	}, nil
+}
+
+// Load CA certificates and key from PEM files.
+func (ca *RealCA) Load(certFile, keyFile string) (*RealCA, error) {
+	blocks, err := pemfile.ReadBlocks(certFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read certificate file: %w", err)
+	}
+
+	var certs []*x509.Certificate
+	var key interface{}
+
+	for _, block := range blocks {
+		if err := pemfile.IsType(block, "CERTIFICATE"); err != nil {
+			return nil, err
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse certificate: %w", err)
+		}
+
+		certs = append(certs, cert)
+
+	}
+
+	// Read private key
+	blocks, err = pemfile.ReadBlocks(keyFile)
+	for _, block := range blocks {
+		err = pemfile.IsType(block, pkcs8PrivateKeyPEMType, pkcs1PrivateKeyPEMType, ecPrivateKeyPEMType)
+		if err != nil {
+			return nil, err
+		}
+
+		switch block.Type {
+		case pkcs8PrivateKeyPEMType:
+			key, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+
+		case pkcs1PrivateKeyPEMType:
+			key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+
+		case ecPrivateKeyPEMType:
+			key, err = x509.ParseECPrivateKey(block.Bytes)
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key: %w", err)
+		}
+	}
+
+	log.Printf("Loaded CA certificates and key from %s and %s", certFile, keyFile)
+
+	return New(certs, key)
 }
 
 // CACerts returns the CA certificates, unless the additional path segment is
 // "triggererrors", in which case an error is returned for testing purposes.
-func (ca *MockCA) CACerts(
+func (ca *RealCA) CACerts(
 	ctx context.Context,
 	aps string,
 	r *http.Request,
@@ -87,10 +154,10 @@ func (ca *MockCA) CACerts(
 
 // CSRAttrs returns an empty sequence of CSR attributes, unless the additional
 // path segment is:
-//  - "csrattrs", in which case it returns the same example sequence described
-//    in RFC7030 4.5.2; or
-//  - "triggererrors", in which case an error is returned for testing purposes.
-func (ca *MockCA) CSRAttrs(
+//   - "csrattrs", in which case it returns the same example sequence described
+//     in RFC7030 4.5.2; or
+//   - "triggererrors", in which case an error is returned for testing purposes.
+func (ca *RealCA) CSRAttrs(
 	ctx context.Context,
 	aps string,
 	r *http.Request,
@@ -136,7 +203,7 @@ func (ca *MockCA) CSRAttrs(
 //   - "Trigger Error Deferred", HTTP status 202 with retry of 600 seconds
 //   - "Trigger Error Unknown", untyped error expected to be interpreted as
 //     an internal server error.
-func (ca *MockCA) Enroll(
+func (ca *RealCA) Enroll(
 	ctx context.Context,
 	csr *x509.CertificateRequest,
 	aps string,
@@ -166,6 +233,7 @@ func (ca *MockCA) Enroll(
 	// Generate certificate template, copying the raw subject and raw
 	// SubjectAltName extension from the CSR.
 	sn, err := rand.Int(rand.Reader, big.NewInt(1).Exp(big.NewInt(2), big.NewInt(128), nil))
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to make serial number: %w", err)
 	}
@@ -216,7 +284,7 @@ func (ca *MockCA) Enroll(
 }
 
 // Reenroll implements est.CA but simply passes the request through to Enroll.
-func (ca *MockCA) Reenroll(
+func (ca *RealCA) Reenroll(
 	ctx context.Context,
 	cert *x509.Certificate,
 	csr *x509.CertificateRequest,
@@ -232,7 +300,7 @@ func (ca *MockCA) Reenroll(
 // signed by the CA certificate(s), itself wrapped in a CMS EnvelopedData
 // encrypted with the pre-shared key "pseudohistorical". A "Bit-Size" HTTP
 // header may be passed with the values 2048, 3072 or 4096.
-func (ca *MockCA) ServerKeyGen(
+func (ca *RealCA) ServerKeyGen(
 	ctx context.Context,
 	csr *x509.CertificateRequest,
 	aps string,
@@ -341,7 +409,7 @@ func (ca *MockCA) ServerKeyGen(
 // encrypted credential, a wrapped encryption key, and the certificate itself
 // encrypted with the encrypted credential in AES 128 Galois Counter Mode
 // inside a CMS EnvelopedData structure.
-func (ca *MockCA) TPMEnroll(
+func (ca *RealCA) TPMEnroll(
 	ctx context.Context,
 	csr *x509.CertificateRequest,
 	ekcerts []*x509.Certificate,
@@ -370,130 +438,6 @@ func (ca *MockCA) TPMEnroll(
 	}
 
 	return blob, secret, cred, err
-}
-
-// New creates a new mock certificate authority. If more than one CA certificate
-// is provided, they should be in order with the issuing (intermediate) CA
-// certificate first, and the root CA certificate last. The private key should
-// be associated with the public key in the first, issuing CA certificate.
-func New(cacerts []*x509.Certificate, key interface{}) (*MockCA, error) {
-	if len(cacerts) < 1 {
-		return nil, errors.New("no CA certificates provided")
-	} else if key == nil {
-		return nil, errors.New("no private key provided")
-	}
-
-	for i := range cacerts {
-		if !cacerts[i].IsCA {
-			return nil, fmt.Errorf("certificate at index %d is not a CA certificate", i)
-		}
-	}
-
-	return &MockCA{
-		certs: cacerts,
-		key:   key,
-	}, nil
-}
-
-// NewFromFiles creates a new mock certificate authority from a PEM-encoded
-// CA certificates chain and a (unencrypted) PEM-encoded private key contained
-// in files. If more than one certificate is contained in the file, the
-// certificates should appear in order with the issuing (intermediate) CA
-// certificate first, and the root certificate last. The private key should be
-// associated with the public key in the first certificate in certspath.
-func NewFromFiles(certspath, keypath string) (*MockCA, error) {
-	certs, err := pemfile.ReadCerts(certspath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load CA certificates from file: %w", err)
-	}
-
-	key, err := pemfile.ReadPrivateKey(keypath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load CA private key from file: %w", err)
-	}
-
-	return New(certs, key)
-}
-
-// NewTransient creates a new mock certificate authority with an automatically
-// generated and transient CA certificates chain for testing purposes.
-func NewTransient() (*MockCA, error) {
-	// Generate a random element for the CA subject common names.
-	randomSuffix, err := makeRandomIdentifier(8)
-	if err != nil {
-		return nil, err
-	}
-
-	// Generate root CA private key and certificate.
-	rootKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate root CA private key: %w", err)
-	}
-
-	rootKI, err := makePublicKeyIdentifier(rootKey.Public())
-	if err != nil {
-		return nil, fmt.Errorf("failed to make root CA public key identifier: %w", err)
-	}
-
-	now := time.Now()
-
-	var tmpl = &x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		NotBefore:             now,
-		NotAfter:              now.Add(rootCertificateDuration),
-		Subject:               pkix.Name{CommonName: "Non-Production Testing Root CA " + randomSuffix},
-		SubjectKeyId:          rootKI,
-		AuthorityKeyId:        rootKI,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-		MaxPathLen:            1,
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-	}
-
-	rootDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, rootKey.Public(), rootKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create root CA certificate: %w", err)
-	}
-
-	rootCert, err := x509.ParseCertificate(rootDER)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse root CA certificate: %w", err)
-	}
-
-	// Generate intermediate CA private key and certificate.
-	interKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate intermediate CA private key: %w", err)
-	}
-
-	interKI, err := makePublicKeyIdentifier(interKey.Public())
-	if err != nil {
-		return nil, fmt.Errorf("failed to make intermediate CA public key identifier: %w", err)
-	}
-
-	tmpl = &x509.Certificate{
-		SerialNumber:          big.NewInt(2),
-		NotBefore:             now,
-		NotAfter:              now.Add(rootCertificateDuration),
-		Subject:               pkix.Name{CommonName: "Non-Production Testing Intermediate CA " + randomSuffix},
-		SubjectKeyId:          interKI,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-		MaxPathLenZero:        true,
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-	}
-
-	interDER, err := x509.CreateCertificate(rand.Reader, tmpl, rootCert, interKey.Public(), rootKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create intermediate CA certificate: %w", err)
-	}
-
-	interCert, err := x509.ParseCertificate(interDER)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse intermediate CA certificate: %w", err)
-	}
-
-	return New([]*x509.Certificate{interCert, rootCert}, interKey)
 }
 
 // makePublicKeyIdentifier builds a public key identifier in accordance with the

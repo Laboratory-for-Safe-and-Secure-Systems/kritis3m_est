@@ -1,4 +1,4 @@
-module github.com/globalsign/est
+module github.com/ayham/est
 
 go 1.22.1
 
@@ -14,9 +14,13 @@ require (
 )
 
 require (
+	github.com/anaskhan96/soup v1.2.4 // indirect
+	github.com/chuongtrh/godepviz v0.1.6 // indirect
 	github.com/miekg/pkcs11 v1.0.3-0.20190429190417-a667d056470f // indirect
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/thales-e-security/pool v0.0.1 // indirect
+	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/term v0.15.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 )
