@@ -1,0 +1,11 @@
+prefix=/home/ayham/repo/kritism-libs-includes
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: wolfSSL
+Description: wolfSSL library for TLS/SSL
+Version: 1.0.0
+Cflags: -I${includedir}/ -I${includedir}/oqs -I${includedir}/wolfssl -I${includedir}/callbacks
+Ldflags: -L${libdir} -lwolfssl -loqs -lcallbacks
+Libs: -L${libdir} -loqs -lcallbacks -lwolfssl -static

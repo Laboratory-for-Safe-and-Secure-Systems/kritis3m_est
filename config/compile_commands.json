@@ -1,0 +1,13 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-I../../../kritism-libs-includes/include/wolfssl",
+      "-I../../../kritism-libs-includes/include",
+      "-c",
+      "callbacks.c"
+    ],
+    "directory": "/home/ayham/repo/pki/go-wolfssl/callbacks",
+    "file": "/home/ayham/repo/pki/go-wolfssl/callbacks/callbacks.c"
+  }
+]
