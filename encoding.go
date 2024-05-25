@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"reflect"
 
 	"github.com/google/go-tpm/tpm2"
@@ -150,7 +149,6 @@ func readCSRAttrsResponse(r io.Reader) (CSRAttrs, error) {
 // code.
 func readAllBase64Request(r io.Reader) ([]byte, error) {
 	b, err := io.ReadAll(r)
-  log.Printf("b: %v", string(b))
 	if err != nil {
 		return nil, errInternal
 	}
