@@ -1,11 +1,5 @@
 package realca
 
-/*
-#cgo CFLAGS: -I../../include/kritis3m_pki -I../../include/liboqs -I../../include/oqs -I../../include
-#cgo LDFLAGS: -L../../lib -lkritis3m_pki
-#include "common.h"
-*/
-import "C"
 import (
 	"context"
 	"crypto"
@@ -86,7 +80,7 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 }
 
 // Load CA certificates and key from PEM files.
-func (ca *RealCA) Load(certFile, keyFile string) (*RealCA, error) {
+func Load(certFile, keyFile string) (*RealCA, error) {
 	blocks, err := pemfile.ReadBlocks(certFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate file: %w", err)

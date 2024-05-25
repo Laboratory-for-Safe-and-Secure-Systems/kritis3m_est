@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"log"
 	"reflect"
 
 	"github.com/google/go-tpm/tpm2"
@@ -74,7 +74,7 @@ func decodePKCS7CertsOnly(b []byte) ([]*x509.Certificate, error) {
 // readAllBase64Response reads all data from a reader and base64-decodes it.
 // It returns a normal error and is intended to be used from client code.
 func readAllBase64Response(r io.Reader) ([]byte, error) {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read HTTP response body: %w", err)
 	}
@@ -149,7 +149,8 @@ func readCSRAttrsResponse(r io.Reader) (CSRAttrs, error) {
 // It returns an error implementing Error and is intended to be used by server
 // code.
 func readAllBase64Request(r io.Reader) ([]byte, error) {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
+  log.Printf("b: %v", string(b))
 	if err != nil {
 		return nil, errInternal
 	}

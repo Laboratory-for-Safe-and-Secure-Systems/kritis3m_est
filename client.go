@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -177,7 +176,7 @@ func (c *Client) Reenroll(ctx context.Context, r *x509.CertificateRequest) (*x50
 
 // Enroll requests a new certificate.
 func (c *Client) enrollCommon(ctx context.Context, r *x509.CertificateRequest, renew bool) (*x509.Certificate, error) {
-	reqBody := ioutil.NopCloser(bytes.NewBuffer(base64Encode(r.Raw)))
+	reqBody := io.NopCloser(bytes.NewBuffer(base64Encode(r.Raw)))
 
 	var endpoint = enrollEndpoint
 	if renew {
@@ -208,7 +207,7 @@ func (c *Client) enrollCommon(ctx context.Context, r *x509.CertificateRequest, r
 
 // ServerKeyGen requests a new certificate and a server-generated private key.
 func (c *Client) ServerKeyGen(ctx context.Context, r *x509.CertificateRequest) (*x509.Certificate, []byte, error) {
-	reqBody := ioutil.NopCloser(bytes.NewBuffer(base64Encode(r.Raw)))
+	reqBody := io.NopCloser(bytes.NewBuffer(base64Encode(r.Raw)))
 
 	req, err := c.newRequest(ctx, http.MethodPost, serverkeygenEndpoint,
 		mimeTypePKCS10, encodingTypeBase64, mimeTypeMultipart, reqBody)
@@ -342,7 +341,7 @@ func (c *Client) TPMEnroll(
 		return nil, nil, nil, err
 	}
 
-	reqBody := ioutil.NopCloser(buf)
+	reqBody := io.NopCloser(buf)
 
 	req, err := c.newRequest(ctx, http.MethodPost, tpmenrollEndpoint,
 		contentType, "", mimeTypeMultipart, reqBody)
@@ -480,7 +479,7 @@ func checkResponseError(r *http.Response) error {
 	if err == nil || r.Header.Get(contentTypeHeader) == "" {
 		switch mediaType {
 		case "", mimeTypeTextPlain, mimeTypeJSON, mimeTypeProblemJSON:
-			data, err := ioutil.ReadAll(r.Body)
+			data, err := io.ReadAll(r.Body)
 			if err != nil {
 				return err
 			}
