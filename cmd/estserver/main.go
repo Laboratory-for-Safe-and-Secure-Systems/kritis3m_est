@@ -16,12 +16,11 @@ limitations under the License.
 package main
 
 import (
-	"crypto/tls"
 	"crypto/x509"
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -29,7 +28,9 @@ import (
 
 	"github.com/ayham/est"
 	"github.com/ayham/est/internal/basiclogger"
+	httpserver "github.com/ayham/est/internal/httpServer"
 	"github.com/ayham/est/internal/realca"
+	wolfSSL "github.com/ayham291/go-wolfssl"
 	"github.com/globalsign/pemfile"
 )
 
@@ -40,6 +41,10 @@ const (
 )
 
 func main() {
+
+	/* Initialize wolfSSL */
+	method := wolfSSL.Method{Name: "TLSv1.3"}
+
 	log.SetPrefix(fmt.Sprintf("%s: ", appName))
 	log.SetFlags(0)
 
@@ -73,10 +78,12 @@ func main() {
 		cfg = &config{}
 	}
 
+	ctx := wolfSSL.InitWolfSSL(cfg.TLS.Certs, cfg.RealCA.Certs, cfg.TLS.Key, false, true, method)
+
 	// Create CA.
 	var ca *realca.RealCA
 	if cfg.RealCA != nil {
-		ca, err = ca.Load(cfg.RealCA.Certs, cfg.RealCA.Key)
+		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key)
 		if err != nil {
 			log.Fatalf("failed to create CA: %v", err)
 		}
@@ -128,6 +135,10 @@ func main() {
 		log.Fatalf("No TLS configuration defined in configuration file")
 	}
 
+  if serverKey == nil {
+    log.Fatalf("No server key defined in configuration file")
+  }
+
 	var tlsCerts [][]byte
 	for i := range serverCerts {
 		tlsCerts = append(tlsCerts, serverCerts[i].Raw)
@@ -136,20 +147,6 @@ func main() {
 	clientCAs := x509.NewCertPool()
 	for _, cert := range clientCACerts {
 		clientCAs.AddCert(cert)
-	}
-
-	tlsCfg := &tls.Config{
-		MinVersion:       tls.VersionTLS12,
-		CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
-		ClientAuth:       tls.VerifyClientCertIfGiven,
-		Certificates: []tls.Certificate{
-			{
-				Certificate: tlsCerts,
-				PrivateKey:  serverKey,
-				Leaf:        serverCerts[0],
-			},
-		},
-		ClientCAs: clientCAs,
 	}
 
 	// Create server mux.
@@ -164,19 +161,15 @@ func main() {
 		log.Fatalf("failed to create new EST router: %v", err)
 	}
 
-	// Create and start server.
-	s := &http.Server{
-		Addr:      listenAddr,
-		Handler:   r,
-		TLSConfig: tlsCfg,
-	}
+	// Create a custom TCP listener
+	tcpListener, err := net.Listen("tcp", listenAddr)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	logger.Infof("Starting EST server")
 
-	go s.ListenAndServeTLS("", "")
+	go httpserver.ServeCustomTLS(ctx, tcpListener, r)
 
 	// Wait for signal.
 	got := <-stop
@@ -184,5 +177,8 @@ func main() {
 	// Shutdown server.
 	logger.Infof("Closing EST server with signal %v", got)
 
-	s.Close()
+	/* Cleanup wolfSSL_CTX object */
+	wolfSSL.WolfSSL_CTX_free((*wolfSSL.WOLFSSL_CTX)(ctx))
+	/* Cleanup the wolfSSL environment */
+	wolfSSL.WolfSSL_Cleanup()
 }

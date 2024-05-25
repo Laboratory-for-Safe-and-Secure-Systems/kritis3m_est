@@ -1,6 +1,5 @@
 package main
 
-import "C"
 import (
 	"bufio"
 	"bytes"
@@ -9,7 +8,7 @@ import (
 	"net"
 	"net/http"
 
-	wolfSSL "github.com/ayham/est/internal/go-wolfssl"
+	wolfSSL "github.com/ayham291/go-wolfssl"
 )
 
 type CustomWriterFunc func(data []byte) (int, error)
@@ -125,11 +124,11 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 	rw.status = statusCode
 	rw.wroteHeader = true
 	statusLine := fmt.Sprintf("HTTP/1.1 %d %s\r\n", statusCode, http.StatusText(statusCode))
-  rw.header.Set("Content-Type", "text/plain")
+  rw.buffer.Reset()
 	rw.buffer.WriteString(statusLine)
   
   // content-length is required for the response to be valid
-  rw.header.Set("Content-Length", fmt.Sprintf("%d", rw.buffer.Len()))
+  rw.header.Set("Content-Length", "20")
 
 	for key, values := range rw.header {
 		for _, value := range values {
@@ -151,11 +150,12 @@ func (rw *responseWriter) Flush() error {
 func main() {
 	CERT_FILE := "../est/certs/server_cert.pem"
 	KEY_FILE := "../est/certs/server_key.pem"
+  CA_FILE := "../est/certs/anchor.pem"
 
 	/* Initialize wolfSSL */
 	method := wolfSSL.Method{Name: "TLSv1.3"}
 
-	ctx := wolfSSL.InitWolfSSL(CERT_FILE, KEY_FILE, false, method)
+	ctx := wolfSSL.InitWolfSSL(CERT_FILE, CA_FILE, KEY_FILE, false, true, method)
 
 	addr := ":8080"
 
