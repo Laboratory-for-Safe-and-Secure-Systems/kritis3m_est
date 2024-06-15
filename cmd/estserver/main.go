@@ -1,18 +1,3 @@
-/*
-Copyright (c) 2020 GMO GlobalSign, Inc.
-
-Licensed under the MIT License (the "License"); you may not use this file except
-in compliance with the License. You may obtain a copy of the License at
-
-https://opensource.org/licenses/MIT
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
@@ -26,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
 	"github.com/ayham/est"
 	"github.com/ayham/est/internal/basiclogger"
 	httpserver "github.com/ayham/est/internal/httpServer"
 	"github.com/ayham/est/internal/realca"
-	wolfSSL "github.com/ayham291/go-wolfssl"
 	"github.com/globalsign/pemfile"
 )
 
@@ -41,10 +26,6 @@ const (
 )
 
 func main() {
-
-	/* Initialize wolfSSL */
-	method := wolfSSL.Method{Name: "TLSv1.3"}
-
 	log.SetPrefix(fmt.Sprintf("%s: ", appName))
 	log.SetFlags(0)
 
@@ -78,7 +59,39 @@ func main() {
 		cfg = &config{}
 	}
 
-	ctx := wolfSSL.InitWolfSSL(cfg.TLS.Certs, cfg.RealCA.Certs, cfg.TLS.Key, false, true, method)
+	// Create and configure the library configuration
+	libConfig := &asl.ASLConfig{
+		LoggingEnabled:       true,
+		LogLevel:             4,
+		SecureElementSupport: false,
+	}
+
+	err = asl.ASLinit(libConfig)
+	if err != nil {
+		log.Fatalf("Error initializing wolfSSL: %v", err)
+	}
+
+	endpointConfig := &asl.EndpointConfig{
+		MutualAuthentication:    cfg.Endpoint.MutualAuthentication,
+		NoEncryption:            cfg.Endpoint.NoEncryption,
+		UseSecureElement:        cfg.Endpoint.UseSecureElement,
+		SecureElementImportKeys: cfg.Endpoint.SecureElementImportKeys,
+		HybridSignatureMode:     asl.HybridSignatureMode(cfg.Endpoint.HybridSignatureMode),
+		DeviceCertificateChain:  asl.DeviceCertificateChain{Path: cfg.TLS.Certs},
+		PrivateKey: asl.PrivateKey{
+			Path: cfg.TLS.Key,
+			// only if the keys are in separate files
+			AdditionalKeyBuffer: nil,
+		},
+		RootCertificate: asl.RootCertificate{Path: cfg.TLS.ClientCAs[0]},
+		KeylogFile:      cfg.Endpoint.KeylogFile,
+	}
+
+	endpoint := asl.ASLsetupServerEndpoint(endpointConfig)
+	// check if the endpoint is not null pointer
+	if endpoint == nil {
+		log.Fatalf("failed to setup server endpoint")
+	}
 
 	// Create CA.
 	var ca *realca.RealCA
@@ -135,9 +148,9 @@ func main() {
 		log.Fatalf("No TLS configuration defined in configuration file")
 	}
 
-  if serverKey == nil {
-    log.Fatalf("No server key defined in configuration file")
-  }
+	if serverKey == nil {
+		log.Fatalf("No server key defined in configuration file")
+	}
 
 	var tlsCerts [][]byte
 	for i := range serverCerts {
@@ -169,7 +182,7 @@ func main() {
 
 	logger.Infof("Starting EST server")
 
-	go httpserver.ServeCustomTLS(ctx, tcpListener, r)
+	go httpserver.ServeCustomTLS(endpoint, tcpListener, r)
 
 	// Wait for signal.
 	got := <-stop
@@ -177,8 +190,6 @@ func main() {
 	// Shutdown server.
 	logger.Infof("Closing EST server with signal %v", got)
 
-	/* Cleanup wolfSSL_CTX object */
-	wolfSSL.WolfSSL_CTX_free((*wolfSSL.WOLFSSL_CTX)(ctx))
 	/* Cleanup the wolfSSL environment */
-	wolfSSL.WolfSSL_Cleanup()
+	asl.ASLFreeEndpoint(endpoint)
 }

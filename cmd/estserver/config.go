@@ -8,13 +8,14 @@ import (
 
 // config contains the EST server configuration.
 type config struct {
-	RealCA              *realCAConfig `json:"ca,omitempty"`
-	TLS                 *tlsConfig    `json:"tls,omitempty"`
-	AllowedHosts        []string      `json:"allowed_hosts,omitempty"`
-	HealthCheckPassword string        `json:"healthcheck_password"`
-	RateLimit           int           `json:"rate_limit"`
-	Timeout             int           `json:"timeout"`
-	Logfile             string        `json:"log_file"`
+	RealCA              *realCAConfig   `json:"ca,omitempty"`
+	TLS                 *tlsConfig      `json:"tls,omitempty"`
+	Endpoint            *endpointConfig `json:"endpoint,omitempty"`
+	AllowedHosts        []string        `json:"allowed_hosts,omitempty"`
+	HealthCheckPassword string          `json:"healthcheck_password"`
+	RateLimit           int             `json:"rate_limit"`
+	Timeout             int             `json:"timeout"`
+	Logfile             string          `json:"log_file"`
 }
 
 // RealCAConfig contains the real CA configuration.
@@ -29,6 +30,16 @@ type tlsConfig struct {
 	Certs      string   `json:"certificates"`
 	Key        string   `json:"private_key"`
 	ClientCAs  []string `json:"client_cas,omitempty"`
+}
+
+// EndpointConfig contains the configuration for an EST endpoint.
+type endpointConfig struct {
+	MutualAuthentication    bool   `json:"mutual_authentication"`
+	NoEncryption            bool   `json:"no_encryption"`
+	UseSecureElement        bool   `json:"use_secure_element"`
+	SecureElementImportKeys bool   `json:"secure_element_import_keys"`
+	HybridSignatureMode     int    `json:"hybrid_signature_mode"`
+	KeylogFile              string `json:"keylog_file"`
 }
 
 // configFromFile returns a new EST server configuration from a JSON-encoded
@@ -61,6 +72,14 @@ const sample = `{
             "/path/to/second/client/CA/root/certificate.pem",
             "/path/to/third/client/CA/root/certificate.pem"
         ]
+    },
+    "endpoint": {
+        "mutual_authentication": true,
+        "no_encryption": false,
+        "use_secure_element": false,
+        "secure_element_import_keys": false,
+        "hybrid_signature_mode": 3,
+        "keylog_file": "/path/to/keylog/file.txt"
     },
     "allowed_hosts": [
         "localhost",

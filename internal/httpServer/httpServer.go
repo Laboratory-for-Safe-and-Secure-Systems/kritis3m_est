@@ -10,8 +10,8 @@ import (
 	"net"
 	"net/http"
 
+	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
 	"github.com/ayham/est"
-	wolfSSL "github.com/ayham291/go-wolfssl"
 )
 
 var logger est.Logger
@@ -19,17 +19,17 @@ var logger est.Logger
 type CustomWriterFunc func(data []byte) (int, error)
 
 // ServeCustomTLS handles incoming connections using custom TLS
-func ServeCustomTLS(ctx *wolfSSL.WOLFSSL_CTX, listener net.Listener, handler http.Handler) error {
+func ServeCustomTLS(aslEndpoint *asl.ASLEndpoint, listener net.Listener, handler http.Handler) error {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			return err
 		}
-		go handleConnection(ctx, conn, handler)
+		go handleConnection(aslEndpoint, conn, handler)
 	}
 }
 
-func readRequest(ssl *wolfSSL.WOLFSSL, buffer []byte) (*http.Request, error) {
+func readRequest(aslSession *asl.ASLSession, buffer []byte) (*http.Request, error) {
 	for {
 		wolfsslBuffer := make([]byte, 1024)
 
@@ -40,7 +40,11 @@ func readRequest(ssl *wolfSSL.WOLFSSL, buffer []byte) (*http.Request, error) {
 			}
 		}
 
-		n := wolfSSL.WolfSSL_read(ssl, wolfsslBuffer, uintptr(len(wolfsslBuffer)))
+		n, err := asl.ASLReceive(aslSession, wolfsslBuffer)
+		if err != nil {
+			logger.Errorf("Failed to receive data: %v", err)
+			return nil, err
+		}
 
 		// append the data to the buffer with the correct length without the extra bytes
 		buffer = append(buffer, wolfsslBuffer[:n]...)
@@ -57,13 +61,16 @@ func readRequest(ssl *wolfSSL.WOLFSSL, buffer []byte) (*http.Request, error) {
 		return nil, err
 	}
 
+  // TODO: in case no Peer Certificate and MTLS is set to true what should happen
+  // current behavior is segmentation fault (null pointer somewhere)
 	// Add TLS connection to the request
-	perrCert, err := wolfSSL.WolfSSL_get_peer_certificate(ssl)
+	wolfsslSession := asl.GetWolfSSLSession(aslSession)
+	perrCert, err := asl.WolfSSL_get_peer_certificate(wolfsslSession)
 	if err != nil && perrCert != nil {
 		logger.Errorf("Failed to get peer certificate: %v", err)
 		return nil, err
 	} else if perrCert == nil {
-    // nothing to do
+		// nothing to do
 	} else {
 		// Add tls connection to the request
 		req.TLS = &tls.ConnectionState{
@@ -82,14 +89,8 @@ func readRequest(ssl *wolfSSL.WOLFSSL, buffer []byte) (*http.Request, error) {
 	return req, nil
 }
 
-func handleConnection(ctx *wolfSSL.WOLFSSL_CTX, conn net.Conn, handler http.Handler) {
+func handleConnection(aslEndpoint *asl.ASLEndpoint, conn net.Conn, handler http.Handler) {
 	defer conn.Close()
-
-	ssl := wolfSSL.WolfSSL_new(ctx)
-	if ssl == nil {
-		logger.Errorf("Failed to create new wolfSSL object")
-		return
-	}
 
 	file, err := conn.(*net.TCPConn).File()
 	if err != nil {
@@ -98,26 +99,17 @@ func handleConnection(ctx *wolfSSL.WOLFSSL_CTX, conn net.Conn, handler http.Hand
 	}
 
 	fd := file.Fd()
-	err = wolfSSL.WolfSSL_set_fd(ssl, int(fd))
-	if err != nil {
-		logger.Errorf("Failed to set file descriptor: %v", err)
-		return
-	}
+	aslSession := asl.ASLCreateSession(aslEndpoint, int(fd))
 	defer file.Close()
 
-	ret := wolfSSL.WolfSSL_accept(ssl)
-	if ret != wolfSSL.WOLFSSL_SUCCESS {
-		ret = wolfSSL.WolfSSL_get_error(ssl, ret)
-		logger.Errorf("Failed to accept connection: %v", ret)
-		message := make([]byte, 64)
-		wolfSSL.WolfSSL_ERR_error_string(ret, message)
-		logger.Errorf("Error message: %s", message)
-		file.Close()
+	err = asl.ASLHandshake(aslSession)
+	if err != nil {
+		logger.Errorf("Failed to handshake: %v", err)
 		return
 	}
 
 	buffer := make([]byte, 0)
-	req, err := readRequest(ssl, buffer)
+	req, err := readRequest(aslSession, buffer)
 	if err != nil {
 		logger.Errorf("Failed to read request: %v", err)
 		return
@@ -125,10 +117,15 @@ func handleConnection(ctx *wolfSSL.WOLFSSL_CTX, conn net.Conn, handler http.Hand
 
 	// Set the remote address
 	req.RemoteAddr = conn.RemoteAddr().String()
+	req.URL.Scheme = "https"
 
 	// Define the custom write function
 	customWrite := func(data []byte) (int, error) {
-		return wolfSSL.WolfSSL_write(ssl, data, uintptr(len(data))), nil
+		err := asl.ASLSend(aslSession, data)
+		if err != nil {
+			return 0, err
+		}
+		return len(data), nil
 	}
 
 	// Create a custom response writer
@@ -142,8 +139,8 @@ func handleConnection(ctx *wolfSSL.WOLFSSL_CTX, conn net.Conn, handler http.Hand
 
 	// Flush the response
 	rw.Flush()
-	wolfSSL.WolfSSL_shutdown(ssl)
-	wolfSSL.WolfSSL_free(ssl)
+	asl.ASLCloseSession(aslSession)
+	asl.ASLFreeSession(aslSession)
 }
 
 // responseWriter is a custom implementation of http.ResponseWriter
