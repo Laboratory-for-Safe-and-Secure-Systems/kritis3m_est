@@ -6,7 +6,7 @@ require (
 	github.com/ThalesIgnite/crypto11 v1.2.1
 	github.com/globalsign/pemfile v1.0.0
 	github.com/globalsign/tpmkeys v1.0.3
-	github.com/google/go-tpm v0.3.2
+	github.com/google/go-tpm v0.9.1
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	golang.org/x/crypto v0.24.0
 	golang.org/x/time v0.5.0

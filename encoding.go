@@ -2,12 +2,15 @@ package est
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 
+	"github.com/google/go-tpm/legacy/tpm2"
 	"go.mozilla.org/pkcs7"
 )
 
@@ -186,6 +189,43 @@ func readCertsRequest(r io.Reader) ([]*x509.Certificate, error) {
 	}
 
 	return certs, nil
+}
+
+// readTPMPublicAreaRequest reads all data from a reader and decodes it as a
+// base64 encoded TPM object public area. It returns an error implementing
+// Error and is intended to be used by server code.
+func readTPMPublicAreaRequest(r io.Reader) ([]byte, error) {
+	pub, estErr := readAllBase64Request(r)
+	if estErr != nil {
+		return nil, estErr
+	}
+
+	if _, err := tpm2.DecodePublic(pub); err != nil {
+		return nil, errInvalidTPMPublicArea
+	}
+
+	return pub, nil
+}
+
+// validatePublicAreaPublicKey checks if the public key in the provided TPM
+// object public area matches the provided public key. It returns an error
+// implementing Error and is intended to be used by server code.
+func validatePublicAreaPublicKey(pub []byte, key crypto.PublicKey) error {
+	dec, err := tpm2.DecodePublic(pub)
+	if err != nil {
+		return errInvalidTPMPublicArea
+	}
+
+	var pk crypto.PublicKey
+	if pk, err = dec.Key(); err != nil {
+		return errExtractPublicAreaKey
+	}
+
+	if !reflect.DeepEqual(pk, key) {
+		return errTPMPublicKeyNoMatch
+	}
+
+	return nil
 }
 
 // breakLines inserts a CRLF line break in the provided slice of bytes every n
