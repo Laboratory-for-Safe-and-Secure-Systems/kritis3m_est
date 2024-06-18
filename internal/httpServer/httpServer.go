@@ -14,22 +14,28 @@ import (
 	"github.com/ayham/est"
 )
 
-var logger est.Logger
+type ASLHTTPServer struct {
+	ASLEndpoint *asl.ASLEndpoint
+	Listener    net.Listener
+	Handler     http.Handler
+	Logger      est.Logger
+}
 
 type CustomWriterFunc func(data []byte) (int, error)
 
-// ServeCustomTLS handles incoming connections using custom TLS
-func ServeCustomTLS(aslEndpoint *asl.ASLEndpoint, listener net.Listener, handler http.Handler) error {
+// ServeTLS handles incoming connections using custom TLS
+func (s *ASLHTTPServer) ServeTLS() {
 	for {
-		conn, err := listener.Accept()
+		conn, err := s.Listener.Accept()
 		if err != nil {
-			return err
+			s.Logger.Errorf("Failed to accept connection: %v", err)
+			return
 		}
-		go handleConnection(aslEndpoint, conn, handler)
+		s.handleConnection(conn)
 	}
 }
 
-func readRequest(aslSession *asl.ASLSession, buffer []byte) (*http.Request, error) {
+func (s *ASLHTTPServer) readRequest(aslSession *asl.ASLSession, buffer []byte, logger est.Logger) (*http.Request, error) {
 	for {
 		wolfsslBuffer := make([]byte, 1024)
 
@@ -61,20 +67,20 @@ func readRequest(aslSession *asl.ASLSession, buffer []byte) (*http.Request, erro
 		return nil, err
 	}
 
-  // TODO: in case no Peer Certificate and MTLS is set to true what should happen
-  // current behavior is segmentation fault (null pointer somewhere)
-	// Add TLS connection to the request
 	wolfsslSession := asl.GetWolfSSLSession(aslSession)
 	perrCert, err := asl.WolfSSL_get_peer_certificate(wolfsslSession)
 	if err != nil && perrCert != nil {
 		logger.Errorf("Failed to get peer certificate: %v", err)
 		return nil, err
 	} else if perrCert == nil {
-		// nothing to do
+		req.TLS = &tls.ConnectionState{
+			HandshakeComplete: true,
+		}
 	} else {
 		// Add tls connection to the request
 		req.TLS = &tls.ConnectionState{
-			PeerCertificates: []*x509.Certificate{perrCert},
+			HandshakeComplete: true,
+			PeerCertificates:  []*x509.Certificate{perrCert},
 		}
 	}
 
@@ -89,7 +95,11 @@ func readRequest(aslSession *asl.ASLSession, buffer []byte) (*http.Request, erro
 	return req, nil
 }
 
-func handleConnection(aslEndpoint *asl.ASLEndpoint, conn net.Conn, handler http.Handler) {
+func (s *ASLHTTPServer) handleConnection(conn net.Conn) {
+	logger := s.Logger
+	handler := s.Handler
+	aslEndpoint := s.ASLEndpoint
+
 	defer conn.Close()
 
 	file, err := conn.(*net.TCPConn).File()
@@ -104,12 +114,12 @@ func handleConnection(aslEndpoint *asl.ASLEndpoint, conn net.Conn, handler http.
 
 	err = asl.ASLHandshake(aslSession)
 	if err != nil {
-		logger.Errorf("Failed to handshake: %v", err)
+		logger.Errorf("%v", err)
 		return
 	}
 
 	buffer := make([]byte, 0)
-	req, err := readRequest(aslSession, buffer)
+	req, err := s.readRequest(aslSession, buffer, logger)
 	if err != nil {
 		logger.Errorf("Failed to read request: %v", err)
 		return
@@ -164,10 +174,6 @@ func (rw *responseWriter) Write(data []byte) (int, error) {
 }
 
 func (rw *responseWriter) WriteHeader(statusCode int) {
-	if rw.wroteHeader {
-		logger.Infof("ResponseWriter.WriteHeader called multiple times")
-		return
-	}
 	rw.status = statusCode
 	rw.wroteHeader = true
 	statusLine := fmt.Sprintf("HTTP/1.1 %d %s\r\n", statusCode, http.StatusText(statusCode))

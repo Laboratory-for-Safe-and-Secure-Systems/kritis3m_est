@@ -11,6 +11,7 @@ type config struct {
 	RealCA              *realCAConfig   `json:"ca,omitempty"`
 	TLS                 *tlsConfig      `json:"tls,omitempty"`
 	Endpoint            *endpointConfig `json:"endpoint,omitempty"`
+	ASLConfig           *aslConfig      `json:"asl_config,omitempty"`
 	AllowedHosts        []string        `json:"allowed_hosts,omitempty"`
 	HealthCheckPassword string          `json:"healthcheck_password"`
 	RateLimit           int             `json:"rate_limit"`
@@ -40,6 +41,13 @@ type endpointConfig struct {
 	SecureElementImportKeys bool   `json:"secure_element_import_keys"`
 	HybridSignatureMode     int    `json:"hybrid_signature_mode"`
 	KeylogFile              string `json:"keylog_file"`
+}
+
+// aslConfig contains the configuration for the ASL library.
+type aslConfig struct {
+	LoggingEnabled       bool `json:"logging_enabled"`
+	LogLevel             int  `json:"log_level"`
+	SecureElementSupport bool `json:"secure_element_support"`
 }
 
 // configFromFile returns a new EST server configuration from a JSON-encoded
@@ -80,6 +88,11 @@ const sample = `{
         "secure_element_import_keys": false,
         "hybrid_signature_mode": 3,
         "keylog_file": "/path/to/keylog/file.txt"
+    },
+    "asl_config": {
+      logging_enabled: true,
+      log_level: 3,
+      secure_element_support: false
     },
     "allowed_hosts": [
         "localhost",

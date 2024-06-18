@@ -79,6 +79,7 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 	}, nil
 }
 
+// TODO: Add support for PQ key.
 // Load CA certificates and key from PEM files.
 func Load(certFile, keyFile string) (*RealCA, error) {
 	blocks, err := pemfile.ReadBlocks(certFile)

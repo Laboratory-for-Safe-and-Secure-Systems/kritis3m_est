@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/x509"
 	"flag"
 	"fmt"
 	"log"
@@ -16,7 +15,6 @@ import (
 	"github.com/ayham/est/internal/basiclogger"
 	httpserver "github.com/ayham/est/internal/httpServer"
 	"github.com/ayham/est/internal/realca"
-	"github.com/globalsign/pemfile"
 )
 
 const (
@@ -61,9 +59,9 @@ func main() {
 
 	// Create and configure the library configuration
 	libConfig := &asl.ASLConfig{
-		LoggingEnabled:       true,
-		LogLevel:             4,
-		SecureElementSupport: false,
+		LoggingEnabled:       cfg.ASLConfig.LoggingEnabled,
+		LogLevel:             int32(cfg.ASLConfig.LogLevel),
+		SecureElementSupport: cfg.ASLConfig.SecureElementSupport,
 	}
 
 	err = asl.ASLinit(libConfig)
@@ -80,7 +78,7 @@ func main() {
 		DeviceCertificateChain:  asl.DeviceCertificateChain{Path: cfg.TLS.Certs},
 		PrivateKey: asl.PrivateKey{
 			Path: cfg.TLS.Key,
-			// only if the keys are in separate files
+			// TODO: only if the keys are in separate files
 			AdditionalKeyBuffer: nil,
 		},
 		RootCertificate: asl.RootCertificate{Path: cfg.TLS.ClientCAs[0]},
@@ -120,47 +118,6 @@ func main() {
 	// Create server TLS configuration. If a server TLS configuration was
 	// specified in the configuration file, use it.
 	var listenAddr = defaultListenAddr
-	var serverKey interface{}
-	var serverCerts []*x509.Certificate
-	var clientCACerts []*x509.Certificate
-
-	if cfg.TLS != nil {
-		serverKey, err = pemfile.ReadPrivateKey(cfg.TLS.Key)
-		if err != nil {
-			log.Fatalf("failed to read server private key from file: %v", err)
-		}
-
-		serverCerts, err = pemfile.ReadCerts(cfg.TLS.Certs)
-		if err != nil {
-			log.Fatalf("failed to read server certificates from file: %v", err)
-		}
-
-		for _, certPath := range cfg.TLS.ClientCAs {
-			certs, err := pemfile.ReadCerts(certPath)
-			if err != nil {
-				log.Fatalf("failed to read client CA certificates from file: %v", err)
-			}
-			clientCACerts = append(clientCACerts, certs...)
-		}
-
-		listenAddr = cfg.TLS.ListenAddr
-	} else {
-		log.Fatalf("No TLS configuration defined in configuration file")
-	}
-
-	if serverKey == nil {
-		log.Fatalf("No server key defined in configuration file")
-	}
-
-	var tlsCerts [][]byte
-	for i := range serverCerts {
-		tlsCerts = append(tlsCerts, serverCerts[i].Raw)
-	}
-
-	clientCAs := x509.NewCertPool()
-	for _, cert := range clientCACerts {
-		clientCAs.AddCert(cert)
-	}
 
 	// Create server mux.
 	r, err := est.NewRouter(&est.ServerConfig{
@@ -182,7 +139,13 @@ func main() {
 
 	logger.Infof("Starting EST server")
 
-	go httpserver.ServeCustomTLS(endpoint, tcpListener, r)
+	var aslServer = httpserver.ASLHTTPServer{
+		ASLEndpoint: endpoint,
+		Listener:    tcpListener,
+		Handler:     r,
+		Logger:      logger,
+	}
+	go aslServer.ServeTLS()
 
 	// Wait for signal.
 	got := <-stop
