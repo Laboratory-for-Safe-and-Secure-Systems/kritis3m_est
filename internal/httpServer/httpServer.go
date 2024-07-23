@@ -9,6 +9,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 
 	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
 	"github.com/ayham/est"
@@ -36,60 +38,132 @@ func (s *ASLHTTPServer) ServeTLS() {
 }
 
 func (s *ASLHTTPServer) readRequest(aslSession *asl.ASLSession, buffer []byte, logger est.Logger) (*http.Request, error) {
-	for {
-		wolfsslBuffer := make([]byte, 1024)
+	const (
+		maxBufferSize     = 10 * 1024 * 1024 // 10MB max request size
+		receiveBufferSize = 4096             // Increased from 1024 for efficiency
+	)
 
-		// check the last 4 bytes of the buffer to see if it is the end of the request
-		if len(buffer) >= 4 {
-			if string(buffer[len(buffer)-4:]) == "\r\n\r\n" {
-				break
+	var (
+		contentLength int
+		headersParsed bool
+		method        string
+		hasBody       bool
+		totalRead     int
+	)
+
+	for {
+		if len(buffer) > maxBufferSize {
+			return nil, fmt.Errorf("request too large: exceeded %d bytes", maxBufferSize)
+		}
+
+		wolfsslBuffer := make([]byte, receiveBufferSize)
+		n, err := asl.ASLReceive(aslSession, wolfsslBuffer)
+		if err != nil {
+			if err == io.EOF {
+				break // Connection closed
+			}
+			return nil, fmt.Errorf("failed to receive data: %w", err)
+		}
+		if n == 0 {
+			return nil, fmt.Errorf("received 0 bytes: connection may have been closed")
+		}
+
+		buffer = append(buffer, wolfsslBuffer[:n]...)
+		totalRead += n
+		logger.Infow("Received data", "totalRead", totalRead, "n", n)
+
+		if !headersParsed {
+			headerEndIndex := bytes.Index(buffer, []byte("\r\n\r\n"))
+			if headerEndIndex != -1 {
+				headers := buffer[:headerEndIndex]
+				headerLines := bytes.Split(headers, []byte("\r\n"))
+				if len(headerLines) == 0 {
+					return nil, fmt.Errorf("no headers found in request")
+				}
+
+				requestLine := string(headerLines[0])
+				parts := strings.Fields(requestLine)
+				if len(parts) < 3 {
+					return nil, fmt.Errorf("invalid request line: %s", requestLine)
+				}
+				method = parts[0]
+
+				switch method {
+				case "POST", "PUT", "PATCH":
+					hasBody = true
+				case "GET", "HEAD", "DELETE", "OPTIONS", "TRACE":
+					hasBody = false
+				default:
+					return nil, fmt.Errorf("unsupported HTTP method: %s", method)
+				}
+
+				for _, line := range headerLines[1:] {
+					if bytes.HasPrefix(bytes.ToLower(line), []byte("content-length:")) {
+						lengthStr := strings.TrimSpace(string(bytes.TrimPrefix(line, []byte("Content-Length:"))))
+						parsedLength, err := strconv.Atoi(lengthStr) // Changed from ParseInt to Atoi
+						if err != nil {
+							return nil, fmt.Errorf("invalid Content-Length value: %w", err)
+						}
+						if parsedLength < 0 {
+							return nil, fmt.Errorf("negative Content-Length: %d", parsedLength)
+						}
+						contentLength = parsedLength
+						logger.Infof("Content-Length: %d", contentLength)
+						break
+					}
+				}
+				headersParsed = true
 			}
 		}
 
-		n, err := asl.ASLReceive(aslSession, wolfsslBuffer)
-		if err != nil {
-			logger.Errorf("Failed to receive data: %v", err)
-			return nil, err
+		if headersParsed {
+			headerEndIndex := bytes.Index(buffer, []byte("\r\n\r\n"))
+			if headerEndIndex != -1 {
+				bodyStart := headerEndIndex + 4
+				bodyLength := int(len(buffer) - bodyStart)
+
+				if hasBody {
+					if contentLength == 0 {
+						return nil, fmt.Errorf("Content-Length header missing for %s request", method)
+					}
+					if bodyLength >= contentLength {
+						break
+					}
+				} else if bodyLength > 0 {
+					return nil, fmt.Errorf("unexpected body for %s request", method)
+				} else {
+					break
+				}
+			}
 		}
-
-		// append the data to the buffer with the correct length without the extra bytes
-		buffer = append(buffer, wolfsslBuffer[:n]...)
-
 	}
 
-	// Read the HTTP request from the wolfSSLBuffer
 	buf := bufio.NewReader(bytes.NewReader(buffer))
-
-	// Parse the HTTP request
 	req, err := http.ReadRequest(buf)
 	if err != nil {
-		logger.Errorf("Failed to read request: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to parse HTTP request: %w", err)
 	}
 
 	wolfsslSession := asl.GetWolfSSLSession(aslSession)
-	perrCert, err := asl.WolfSSL_get_peer_certificate(wolfsslSession)
-	if err != nil && perrCert != nil {
+	peerCert, err := asl.WolfSSL_get_peer_certificate(wolfsslSession)
+	if err != nil {
 		logger.Errorf("Failed to get peer certificate: %v", err)
-		return nil, err
-	} else if perrCert == nil {
-		req.TLS = &tls.ConnectionState{
-			HandshakeComplete: true,
-		}
-	} else {
-		// Add tls connection to the request
-		req.TLS = &tls.ConnectionState{
-			HandshakeComplete: true,
-			PeerCertificates:  []*x509.Certificate{perrCert},
-		}
 	}
 
-	body, _ := io.ReadAll(req.Body)
-	req.Body = io.NopCloser(bytes.NewBuffer(body)) // Reset the body after reading
-	err = req.Body.Close()
-	if err != nil {
-		logger.Errorf("Failed to close request body: %v", err)
-		return nil, err
+	req.TLS = &tls.ConnectionState{
+		HandshakeComplete: true,
+	}
+	if peerCert != nil {
+		req.TLS.PeerCertificates = []*x509.Certificate{peerCert}
+	}
+
+	if req.Body != nil {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read request body: %w", err)
+		}
+		req.Body.Close()
+		req.Body = io.NopCloser(bytes.NewBuffer(body))
 	}
 
 	return req, nil
