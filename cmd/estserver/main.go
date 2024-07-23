@@ -61,7 +61,6 @@ func main() {
 	libConfig := &asl.ASLConfig{
 		LoggingEnabled:       cfg.ASLConfig.LoggingEnabled,
 		LogLevel:             int32(cfg.ASLConfig.LogLevel),
-		SecureElementSupport: cfg.ASLConfig.SecureElementSupport,
 	}
 
 	err = asl.ASLinit(libConfig)
