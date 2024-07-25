@@ -31,6 +31,10 @@ type Logger interface {
 	// key-value pairs are treated as they are in With.
 	Infow(format string, keysAndValues ...interface{})
 
+  // Debugf uses fmt.Sprintf to log a formatted message.
+  // Does not log by default, only for debugging purposes.
+  Debugf(format string, args ...interface{})
+
 	// With adds a variadic number of key-values pairs to the logging context.
 	// The first element of the pair is used as the field key and should be a
 	// string. Passing a non-string key or passing an orphaned key panics.
@@ -48,6 +52,8 @@ func (l *nopLogger) Errorw(msg string, keysAndValues ...interface{}) {}
 func (l *nopLogger) Infof(format string, args ...interface{}) {}
 
 func (l *nopLogger) Infow(msg string, keysAndValues ...interface{}) {}
+
+func (l *nopLogger) Debugf(format string, args ...interface{}) {}
 
 func (l *nopLogger) With(keysAndValues ...interface{}) Logger {
 	return l
