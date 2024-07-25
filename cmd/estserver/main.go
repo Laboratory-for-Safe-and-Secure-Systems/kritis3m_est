@@ -80,7 +80,7 @@ func main() {
 			// TODO: only if the keys are in separate files
 			AdditionalKeyBuffer: nil,
 		},
-		RootCertificate: asl.RootCertificate{Path: cfg.TLS.ClientCAs[0]},
+		RootCertificate: asl.RootCertificate{Path: cfg.RealCA.Certs},
 		KeylogFile:      cfg.Endpoint.KeylogFile,
 	}
 
