@@ -2,24 +2,22 @@ package realca
 
 import (
 	"context"
-	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"math/big"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/ayham/est"
 	"github.com/ayham/est/internal/tpm"
-	"github.com/globalsign/pemfile"
 	"go.mozilla.org/pkcs7"
 )
 
@@ -47,13 +45,16 @@ const (
 	pkcs1PublicKeyPEMType  = "RSA PUBLIC KEY"
 )
 
+// ASL PKI
+var aslPKI = NewASLPKI()
+
 // RealCA is a simple CA implementation that uses a single key pair and
 // certificate to sign requests.
 // It uses Root 1 Intermediate 2 Entity hierarchy.
 type RealCA struct {
-	certs []*x509.Certificate
-	key   interface{}
-	pqKey interface{}
+	certs  []*x509.Certificate
+	key    interface{}
+	aslPKI *ASLPKI
 }
 
 // New creates a new mock certificate authority. If more than one CA certificate
@@ -74,63 +75,63 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 	}
 
 	return &RealCA{
-		certs: cacerts,
-		key:   key,
+		certs:  cacerts,
+		key:    key,
+		aslPKI: aslPKI,
 	}, nil
 }
 
-// TODO: Add support for PQ key.
 // Load CA certificates and key from PEM files.
 func Load(certFile, keyFile string) (*RealCA, error) {
-	blocks, err := pemfile.ReadBlocks(certFile)
+	certData, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate file: %w", err)
 	}
 
-	var certs []*x509.Certificate
-	var key interface{}
-
-	for _, block := range blocks {
-		if err := pemfile.IsType(block, "CERTIFICATE"); err != nil {
-			return nil, err
-		}
-
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse certificate: %w", err)
-		}
-
-		certs = append(certs, cert)
-
+	keyData, err := os.ReadFile(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read key file: %w", err)
 	}
 
-	// Read private key
-	blocks, err = pemfile.ReadBlocks(keyFile)
-	for _, block := range blocks {
-		err = pemfile.IsType(block, pkcs8PrivateKeyPEMType, pkcs1PrivateKeyPEMType, ecPrivateKeyPEMType)
-		if err != nil {
-			return nil, err
-		}
+	err = aslPKI.LoadPrivateKey(keyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load private key: %w", err)
+	}
 
-		switch block.Type {
-		case pkcs8PrivateKeyPEMType:
-			key, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+	err = aslPKI.LoadIssuerCert(certData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load issuer cert: %w", err)
+	}
 
-		case pkcs1PrivateKeyPEMType:
-			key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-
-		case ecPrivateKeyPEMType:
-			key, err = x509.ParseECPrivateKey(block.Bytes)
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key: %w", err)
-		}
+	// Parse certificates for RealCA
+	certs, err := parseCertificates(certData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificates: %w", err)
 	}
 
 	log.Printf("Loaded CA certificates and key from %s and %s", certFile, keyFile)
 
-	return New(certs, key)
+	return New(certs, keyData)
+}
+
+func parseCertificates(certData []byte) ([]*x509.Certificate, error) {
+	var certs []*x509.Certificate
+	for len(certData) > 0 {
+		var block *pem.Block
+		block, certData = pem.Decode(certData)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		certs = append(certs, cert)
+	}
+	return certs, nil
 }
 
 // CACerts returns the CA certificates, unless the additional path segment is
@@ -225,54 +226,40 @@ func (ca *RealCA) Enroll(
 		}
 	}
 
-	// Generate certificate template, copying the raw subject and raw
-	// SubjectAltName extension from the CSR.
-	sn, err := rand.Int(rand.Reader, big.NewInt(1).Exp(big.NewInt(2), big.NewInt(128), nil))
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to make serial number: %w", err)
-	}
-
-	ski, err := makePublicKeyIdentifier(csr.PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make public key identifier: %w", err)
-	}
-
-	now := time.Now()
-	notAfter := now.Add(defaultCertificateDuration)
-	if latest := ca.certs[0].NotAfter.Sub(notAfter); latest < 0 {
-		// Don't issue any certificates which expire after the CA certificate.
-		notAfter = ca.certs[0].NotAfter
-	}
-
-	var tmpl = &x509.Certificate{
-		SerialNumber:          sn,
-		NotBefore:             now,
-		NotAfter:              notAfter,
-		RawSubject:            csr.RawSubject,
-		SubjectKeyId:          ski,
-		BasicConstraintsValid: true,
-		IsCA:                  false,
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-	}
-
-	for _, ext := range csr.Extensions {
-		if ext.Id.Equal(oidSubjectAltName) {
-			tmpl.ExtraExtensions = append(tmpl.ExtraExtensions, ext)
-			break
-		}
-	}
-
-	// Create and return certificate.
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, ca.certs[0], csr.PublicKey, ca.key)
+	// Create certificate using aslPKI
+	err := aslPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration.Hours()/24), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
 
-	cert, err := x509.ParseCertificate(der)
+	// Finalize the certificate
+	pemCertData, err := aslPKI.FinalizeCertificate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to finalize certificate: %w", err)
+	}
+
+	// Decode PEM to get DER
+	block, _ := pem.Decode(pemCertData)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM data")
+	}
+
+	if block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("PEM block is not a certificate")
+	}
+
+	derCertData := block.Bytes
+
+	// Parse the certificate
+	cert, err := x509.ParseCertificate(derCertData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	// verify the certificate
+	err = cert.CheckSignatureFrom(ca.certs[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify certificate: %w", err)
 	}
 
 	return cert, nil
@@ -433,33 +420,4 @@ func (ca *RealCA) TPMEnroll(
 	}
 
 	return blob, secret, cred, err
-}
-
-// makePublicKeyIdentifier builds a public key identifier in accordance with the
-// first method described in RFC5280 section 4.2.1.2.
-func makePublicKeyIdentifier(pub crypto.PublicKey) ([]byte, error) {
-	keyBytes, err := x509.MarshalPKIXPublicKey(pub)
-	if err != nil {
-		return nil, err
-	}
-
-	id := sha1.Sum(keyBytes)
-
-	return id[:], nil
-}
-
-// makeRandomIdentifier makes a random alphanumeric identifier of length n.
-func makeRandomIdentifier(n int) (string, error) {
-	var id = make([]byte, n)
-
-	for i := range id {
-		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphanumerics))))
-		if err != nil {
-			return "", fmt.Errorf("failed to generate random number: %w", err)
-		}
-
-		id[i] = alphanumerics[idx.Int64()]
-	}
-
-	return string(id), nil
 }
