@@ -138,6 +138,7 @@ func (s *ASLHTTPServer) readRequest(aslSession *asl.ASLSession, buffer []byte, l
 		}
 	}
 
+	logger.Debugf("Buffer: %q", buffer)
 	buf := bufio.NewReader(bytes.NewReader(buffer))
 	req, err := http.ReadRequest(buf)
 	if err != nil {
@@ -160,7 +161,12 @@ func (s *ASLHTTPServer) readRequest(aslSession *asl.ASLSession, buffer []byte, l
 	if req.Body != nil {
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read request body: %w", err)
+			// if error is unexpected EOF, then add \n to the body
+			if err == io.ErrUnexpectedEOF {
+				body = append(body, '\n')
+			} else {
+				return nil, fmt.Errorf("failed to read request body: %w", err)
+			}
 		}
 		req.Body.Close()
 		req.Body = io.NopCloser(bytes.NewBuffer(body))
