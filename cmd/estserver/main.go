@@ -71,8 +71,7 @@ func main() {
 	endpointConfig := &asl.EndpointConfig{
 		MutualAuthentication:    cfg.Endpoint.MutualAuthentication,
 		NoEncryption:            cfg.Endpoint.NoEncryption,
-		UseSecureElement:        cfg.Endpoint.UseSecureElement,
-		SecureElementImportKeys: cfg.Endpoint.SecureElementImportKeys,
+    ASLKeyExchangeMethod:    asl.ASLKeyExchangeMethod(cfg.Endpoint.ASLKeyExchangeMethod),
 		HybridSignatureMode:     asl.HybridSignatureMode(cfg.Endpoint.HybridSignatureMode),
 		DeviceCertificateChain:  asl.DeviceCertificateChain{Path: cfg.TLS.Certs},
 		PrivateKey: asl.PrivateKey{
