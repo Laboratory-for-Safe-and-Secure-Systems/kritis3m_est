@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,7 +13,7 @@ import (
 	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
 	"github.com/ayham/est"
 	"github.com/ayham/est/internal/basiclogger"
-	httpserver "github.com/ayham/est/internal/httpServer"
+	"github.com/ayham/est/internal/aslhttpserver"
 	"github.com/ayham/est/internal/realca"
 )
 
@@ -59,8 +59,8 @@ func main() {
 
 	// Create and configure the library configuration
 	libConfig := &asl.ASLConfig{
-		LoggingEnabled:       cfg.ASLConfig.LoggingEnabled,
-		LogLevel:             int32(cfg.ASLConfig.LogLevel),
+		LoggingEnabled: cfg.ASLConfig.LoggingEnabled,
+		LogLevel:       int32(cfg.ASLConfig.LogLevel),
 	}
 
 	err = asl.ASLinit(libConfig)
@@ -69,11 +69,11 @@ func main() {
 	}
 
 	endpointConfig := &asl.EndpointConfig{
-		MutualAuthentication:    cfg.Endpoint.MutualAuthentication,
-		NoEncryption:            cfg.Endpoint.NoEncryption,
-    ASLKeyExchangeMethod:    asl.ASLKeyExchangeMethod(cfg.Endpoint.ASLKeyExchangeMethod),
-		HybridSignatureMode:     asl.HybridSignatureMode(cfg.Endpoint.HybridSignatureMode),
-		DeviceCertificateChain:  asl.DeviceCertificateChain{Path: cfg.TLS.Certs},
+		MutualAuthentication:   cfg.Endpoint.MutualAuthentication,
+		NoEncryption:           cfg.Endpoint.NoEncryption,
+		ASLKeyExchangeMethod:   asl.ASLKeyExchangeMethod(cfg.Endpoint.ASLKeyExchangeMethod),
+		HybridSignatureMode:    asl.HybridSignatureMode(cfg.Endpoint.HybridSignatureMode),
+		DeviceCertificateChain: asl.DeviceCertificateChain{Path: cfg.TLS.Certs},
 		PrivateKey: asl.PrivateKey{
 			Path: cfg.TLS.Key,
 			// TODO: only if the keys are in separate files
@@ -129,21 +129,25 @@ func main() {
 		log.Fatalf("failed to create new EST router: %v", err)
 	}
 
-	// Create a custom TCP listener
-	tcpListener, err := net.Listen("tcp", listenAddr)
-
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	logger.Infof("Starting EST server")
 
-	var aslServer = httpserver.ASLHTTPServer{
-		ASLEndpoint: endpoint,
-		Listener:    tcpListener,
-		Handler:     r,
-		Logger:      logger,
+	var aslServer = aslhttpserver.ASLServer{
+		Server: &http.Server{
+			Addr:    listenAddr,
+			Handler: r,
+		},
+		ASLTLSEndpoint: endpoint,
 	}
-	go aslServer.ServeTLS()
+
+	go func() {
+		err := aslServer.ListenAndServeASLTLS()
+		if err != nil {
+			log.Fatalf("failed to start ASL server: %v", err)
+		}
+	}()
 
 	// Wait for signal.
 	got := <-stop

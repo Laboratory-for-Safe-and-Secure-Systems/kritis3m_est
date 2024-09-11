@@ -35,12 +35,11 @@ type tlsConfig struct {
 
 // EndpointConfig contains the configuration for an EST endpoint.
 type endpointConfig struct {
-	MutualAuthentication    bool   `json:"mutual_authentication"`
-	NoEncryption            bool   `json:"no_encryption"`
-	UseSecureElement        bool   `json:"use_secure_element"`
-	SecureElementImportKeys bool   `json:"secure_element_import_keys"`
-	HybridSignatureMode     int    `json:"hybrid_signature_mode"`
-	KeylogFile              string `json:"keylog_file"`
+	MutualAuthentication bool   `json:"mutual_authentication"`
+	NoEncryption         bool   `json:"no_encryption"`
+	ASLKeyExchangeMethod int    `json:"asl_key_exchange_method"`
+	HybridSignatureMode  int    `json:"hybrid_signature_mode"`
+	KeylogFile           string `json:"keylog_file"`
 }
 
 // aslConfig contains the configuration for the ASL library.
