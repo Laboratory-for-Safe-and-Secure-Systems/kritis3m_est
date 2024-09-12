@@ -13,7 +13,7 @@ require (
 )
 
 require (
-	github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v0.0.0-20240716130555-e1e69f8bd5b8 // indirect
+	github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v1.0.0 // indirect
 	github.com/anaskhan96/soup v1.2.4 // indirect
 	github.com/chuongtrh/godepviz v0.1.6 // indirect
 	github.com/go-chi/chi/v5 v5.0.12 // indirect

@@ -6,6 +6,10 @@ github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v0.0.0-202406151543
 github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v0.0.0-20240615154345-e790691a1153/go.mod h1:f85s97NGSn7M4iWl8WPQyiBaJgdv+MH3EslVRflCo9g=
 github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v0.0.0-20240716130555-e1e69f8bd5b8 h1:2cADTfRdqPCOdFJhy3e5ubSq7IsL1zHv0pEluRY/YPI=
 github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v0.0.0-20240716130555-e1e69f8bd5b8/go.mod h1:f85s97NGSn7M4iWl8WPQyiBaJgdv+MH3EslVRflCo9g=
+github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v0.0.0-20240911170043-34c8acb0e878 h1:MwzkNe78TJSrypqy+rCrZBx72Fkme8ZY1wwpW0jkI6I=
+github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v0.0.0-20240911170043-34c8acb0e878/go.mod h1:f85s97NGSn7M4iWl8WPQyiBaJgdv+MH3EslVRflCo9g=
+github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v1.0.0 h1:wzvEijSA6a6LmE1CyeAzxxaxdL+DGC6cH9G4aPYvt78=
+github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v1.0.0/go.mod h1:f85s97NGSn7M4iWl8WPQyiBaJgdv+MH3EslVRflCo9g=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/ThalesIgnite/crypto11 v1.2.1/go.mod h1:vmlYtalkn8uCp3eStRZ0r7Sslmf1jAtL8De0PIyqPks=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
