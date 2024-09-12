@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ayham/est"
+	"github.com/ayham/est/internal/db"
 	"github.com/ayham/est/internal/tpm"
 	"go.mozilla.org/pkcs7"
 )
@@ -52,9 +53,10 @@ var kritis3mPKI = NewKRITIS3MPKI()
 // certificate to sign requests.
 // It uses Root 1 Intermediate 2 Entity hierarchy.
 type RealCA struct {
-	certs  []*x509.Certificate
-	key    interface{}
+	certs       []*x509.Certificate
+	key         interface{}
 	kritis3mPKI *KRITIS3MPKI
+	database    *db.DB
 }
 
 // New creates a new mock certificate authority. If more than one CA certificate
@@ -74,10 +76,17 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 		}
 	}
 
+	database, err := db.NewDB("sqlite", "test.db")
+	if err != nil {
+		log.Fatalf("failed to connect to sqlite database: %v", err)
+	}
+	log.Println("Successfully connected to SQLite!")
+
 	return &RealCA{
-		certs:  cacerts,
-		key:    key,
+		certs:       cacerts,
+		key:         key,
 		kritis3mPKI: kritis3mPKI,
+		database:    database,
 	}, nil
 }
 
