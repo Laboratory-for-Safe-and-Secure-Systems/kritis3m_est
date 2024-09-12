@@ -12,8 +12,8 @@ import (
 
 	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
 	"github.com/ayham/est"
-	"github.com/ayham/est/internal/basiclogger"
 	"github.com/ayham/est/internal/aslhttpserver"
+	"github.com/ayham/est/internal/basiclogger"
 	"github.com/ayham/est/internal/realca"
 )
 
@@ -55,6 +55,7 @@ func main() {
 		}
 	} else {
 		cfg = &config{}
+		log.Fatalf("No configuration file specified")
 	}
 
 	// Create and configure the library configuration
