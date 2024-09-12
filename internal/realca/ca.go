@@ -46,7 +46,7 @@ const (
 )
 
 // ASL PKI
-var aslPKI = NewASLPKI()
+var kritis3mPKI = NewKRITIS3MPKI()
 
 // RealCA is a simple CA implementation that uses a single key pair and
 // certificate to sign requests.
@@ -54,7 +54,7 @@ var aslPKI = NewASLPKI()
 type RealCA struct {
 	certs  []*x509.Certificate
 	key    interface{}
-	aslPKI *ASLPKI
+	kritis3mPKI *KRITIS3MPKI
 }
 
 // New creates a new mock certificate authority. If more than one CA certificate
@@ -77,7 +77,7 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 	return &RealCA{
 		certs:  cacerts,
 		key:    key,
-		aslPKI: aslPKI,
+		kritis3mPKI: kritis3mPKI,
 	}, nil
 }
 
@@ -93,12 +93,12 @@ func Load(certFile, keyFile string) (*RealCA, error) {
 		return nil, fmt.Errorf("failed to read key file: %w", err)
 	}
 
-	err = aslPKI.LoadPrivateKey(keyData)
+	err = kritis3mPKI.LoadPrivateKey(keyData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}
 
-	err = aslPKI.LoadIssuerCert(certData)
+	err = kritis3mPKI.LoadIssuerCert(certData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load issuer cert: %w", err)
 	}
@@ -227,13 +227,13 @@ func (ca *RealCA) Enroll(
 	}
 
 	// Create certificate using aslPKI
-	err := aslPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration.Hours()/24), false)
+	err := kritis3mPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration.Hours()/24), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
 
 	// Finalize the certificate
-	pemCertData, err := aslPKI.FinalizeCertificate()
+	pemCertData, err := kritis3mPKI.FinalizeCertificate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize certificate: %w", err)
 	}
