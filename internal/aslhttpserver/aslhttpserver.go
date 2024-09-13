@@ -1,6 +1,9 @@
 package aslhttpserver
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
 	"net"
@@ -16,12 +19,24 @@ type ASLServer struct {
 	ASLTLSEndpoint *asl.ASLEndpoint // Custom ASL Endpoint configuration
 }
 
+type contextKey string
+
+const TLSStateKey contextKey = "tlsState"
+
 // Constructor for ASLServer
 func NewASLServer(addr string, handler http.Handler, endpointConfig *asl.EndpointConfig) *ASLServer {
 	// Initialize http.Server
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: handler,
+	}
+
+	// Set the ConnContext function
+	srv.ConnContext = func(ctx context.Context, c net.Conn) context.Context {
+		if aslConn, ok := c.(*ASLConn); ok {
+			ctx = context.WithValue(ctx, TLSStateKey, aslConn.TLSState)
+		}
+		return ctx
 	}
 
 	// Setup ASL Endpoint (optional at initialization)
@@ -44,6 +59,8 @@ func NewASLServer(addr string, handler http.Handler, endpointConfig *asl.Endpoin
 type ASLConn struct {
 	tcpConn    *net.TCPConn
 	aslSession *asl.ASLSession
+	peerCert   *x509.Certificate // Store the peer's certificate
+	TLSState   *tls.ConnectionState
 }
 
 func (c ASLConn) Read(b []byte) (n int, err error) {
@@ -84,6 +101,26 @@ func (c ASLConn) SetWriteDeadline(t time.Time) error {
 	return c.tcpConn.SetWriteDeadline(t)
 }
 
+// Simulate a TLS connection state
+func (c *ASLConn) simulateTLSState() {
+	// Capture and store the peer certificate (if available)
+	wolfssl := asl.GetWolfSSLSession(c.aslSession)
+	peerCert, err := asl.WolfSSL_get_peer_certificate(wolfssl)
+	if err == nil {
+		c.peerCert = peerCert
+	} else {
+		log.Printf("Failed to get peer certificate: %v", err)
+	}
+
+	// Populate tls.ConnectionState
+	if c.peerCert != nil {
+		c.TLSState = &tls.ConnectionState{
+			HandshakeComplete: true,
+			PeerCertificates:  []*x509.Certificate{c.peerCert},
+		}
+	}
+}
+
 // ASLListener wraps a net.TCPListener and handles ASL sessions
 type ASLListener struct {
 	tcpListener *net.TCPListener
@@ -116,6 +153,9 @@ func (l ASLListener) Accept() (net.Conn, error) {
 		tcpConn.Close()
 		log.Printf("ASL handshake failed: %v", err)
 	}
+
+	// Simulate a TLS connection state
+	aslConn.simulateTLSState()
 
 	return aslConn, nil
 }

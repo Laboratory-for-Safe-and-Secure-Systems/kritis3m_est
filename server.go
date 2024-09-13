@@ -3,6 +3,7 @@ package est
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ayham/est/internal/aslhttpserver"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.mozilla.org/pkcs7"
@@ -128,6 +130,7 @@ func NewRouter(cfg *ServerConfig) (http.Handler, error) {
 	r.Use(middleware.Timeout(timeout))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	r.Use(tlsMiddleware)
 	r.Use(withLogger(logger))
 	r.Use(recoverer(logger))
 	r.Use(addServerHeader)
@@ -292,7 +295,7 @@ func enroll(w http.ResponseWriter, r *http.Request) {
 		// This server does not support clients which do not support TLS client
 		// authentication for renew operations.
 
-		if len(r.TLS.PeerCertificates) == 0 {
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
 			errNoClientCertificate.Write(w)
 			return
 		}
@@ -420,6 +423,18 @@ func writeOnError(ctx context.Context, w http.ResponseWriter, msg string, err er
 	}
 
 	return true
+}
+
+func tlsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS == nil {
+			tlsState, ok := r.Context().Value(aslhttpserver.TLSStateKey).(*tls.ConnectionState)
+			if ok {
+				r.TLS = tlsState
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // withLogger is middleware that logs each HTTP request.

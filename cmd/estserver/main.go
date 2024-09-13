@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -139,6 +141,16 @@ func main() {
 		Server: &http.Server{
 			Addr:    listenAddr,
 			Handler: r,
+			ConnContext: func(ctx context.Context, c net.Conn) context.Context {
+				if aslConn, ok := c.(*aslhttpserver.ASLConn); ok {
+					if aslConn.TLSState != nil {
+            logger.Infof("Setting TLS state in ConnContext")
+						// Attach the TLS state to the context
+						return context.WithValue(ctx, aslhttpserver.TLSStateKey, aslConn.TLSState)
+					}
+				}
+				return ctx
+			},
 		},
 		ASLTLSEndpoint: endpoint,
 	}
