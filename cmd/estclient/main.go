@@ -19,9 +19,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
 )
 
 func main() {
+	// Set ASL
+	aslConfig := &asl.ASLConfig{
+		LoggingEnabled: true,
+		LogLevel:       3,
+	}
+	asl.ASLinit(aslConfig)
+
 	log.SetPrefix(fmt.Sprintf("%s: ", appName))
 	log.SetFlags(0)
 

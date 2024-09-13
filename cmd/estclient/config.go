@@ -19,10 +19,13 @@ import (
 
 	"github.com/ThalesIgnite/crypto11"
 	"github.com/ayham/est"
+	"github.com/ayham/est/internal/realca"
 	"golang.org/x/term"
 
 	"github.com/globalsign/pemfile"
 )
+
+var kritis3mPKI = realca.NewKRITIS3MPKI()
 
 // config contains configuration options.
 type config struct {
@@ -35,7 +38,7 @@ type config struct {
 	Explicit          string            `json:"explicit_anchor"`
 	Implicit          string            `json:"implicit_anchor"`
 	PrivateKey        *privateKey       `json:"private_key,omitempty"`
-	Certificates      string            `json:"client_certificates"`
+	Certificate       string            `json:"client_certificates"`
 	certificates      []*x509.Certificate
 	ekcerts           []*x509.Certificate
 	baseDir           string
@@ -111,11 +114,11 @@ func (cfg *config) MakeClient() (*est.Client, error) {
 		Host:                  cfg.Server,
 		AdditionalPathSegment: cfg.APS,
 		AdditionalHeaders:     cfg.AdditionalHeaders,
-		ExplicitAnchor:        cfg.explicitAnchor,
-		ImplicitAnchor:        cfg.implicitAnchor,
+		ExplicitAnchor:        cfg.Explicit,
+		ImplicitAnchor:        cfg.Implicit,
 		HostHeader:            cfg.HostHeader,
-		PrivateKey:            cfg.openPrivateKey,
-		Certificates:          cfg.certificates,
+		PrivateKeyPath:        cfg.PrivateKey.Path,
+		CertificatePath:       cfg.Certificate,
 		Username:              cfg.Username,
 		Password:              cfg.Password,
 		InsecureSkipVerify:    cfg.insecure,
@@ -235,10 +238,18 @@ func (cfg *config) CSRTemplate() (*x509.CertificateRequest, error) {
 func (k *privateKey) Get(baseDir string) (interface{}, func() error, error) {
 	switch {
 	case k.Path != "":
-		key, err := pemfile.ReadPrivateKeyWithPasswordFunc(fullPath(baseDir, k.Path), nil)
+    var key interface{}
+    keyData, err := os.ReadFile(fullPath(baseDir, k.Path))
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("failed to read key file: %w", err)
 		}
+
+		err = kritis3mPKI.LoadPrivateKey(keyData)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to load private key: %w", err)
+		}
+
+    key = keyData
 
 		return key, func() error { return nil }, nil
 
@@ -503,13 +514,13 @@ func newConfig(set *flag.FlagSet) (config, error) {
 
 	// Process client certificate(s).
 	if filename, ok := cfg.flags[certsFlag]; ok {
-		cfg.Certificates = fullPath(wd, filename)
-	} else if cfg.Certificates != "" {
-		cfg.Certificates = fullPath(cfg.baseDir, cfg.Certificates)
+		cfg.Certificate = fullPath(wd, filename)
+	} else if cfg.Certificate != "" {
+		cfg.Certificate = fullPath(cfg.baseDir, cfg.Certificate)
 	}
 
-	if cfg.Certificates != "" {
-		certs, err := pemfile.ReadCerts(cfg.Certificates)
+	if cfg.Certificate != "" {
+		certs, err := pemfile.ReadCerts(cfg.Certificate)
 		if err != nil {
 			return config{}, fmt.Errorf("failed to read client certificates: %v", err)
 		}

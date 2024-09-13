@@ -18,17 +18,20 @@ package est
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
+	"github.com/ayham/est/internal/aslhttpclient"
 )
 
 // Client is an EST client implementing the Enrollment over Secure Transport
@@ -51,23 +54,23 @@ type Client struct {
 	AdditionalPathSegment string
 
 	// ExplicitAnchor is the optional Explicit TA database. See RFC7030 3.6.1.
-	ExplicitAnchor *x509.CertPool
+	ExplicitAnchor string
 
 	// ImplicitAnchor is an optional Implicit TA database. If nil, the system
 	// certificate pool will be used. See RFC7030 3.6.2.
-	ImplicitAnchor *x509.CertPool
+	ImplicitAnchor string
 
-	// Certificates are the client certificates to present to the EST server
+	// CertificatePath are the client certificates to present to the EST server
 	// during the handshake. If more than one certificate is provided, they
 	// should be provided in order, with the end-entity certificate first, and
 	// the root CA (or last intermediate CA) certificate last.
-	Certificates []*x509.Certificate
+	CertificatePath string
 
-	// PrivateKey is the private key associated with the end-entity TLS
+	// PrivateKeyPath is the private key associated with the end-entity TLS
 	// certificate. Any object implementing crypto.Signer may be used, to
 	// support private keys resident on a hardware security module (HSM),
 	// Trusted Platform Module (TPM) or other hardware device.
-	PrivateKey interface{}
+	PrivateKeyPath string
 
 	// AdditionalHeaders are additional HTTP headers to include with the
 	// request to the EST server.
@@ -542,29 +545,33 @@ func (c *Client) uri(endpoint string) string {
 // makeHTTPClient makes and configures an HTTP client for connecting to an
 // EST server.
 func (c *Client) makeHTTPClient() *http.Client {
-	var rootCAs *x509.CertPool
-	if c.ExplicitAnchor != nil {
-		rootCAs = c.ExplicitAnchor
-	} else if c.ImplicitAnchor != nil {
-		rootCAs = c.ImplicitAnchor
+	config := &asl.EndpointConfig{
+		MutualAuthentication: true,
+		NoEncryption:         false,
+		ASLKeyExchangeMethod: 0,
+		HybridSignatureMode:  0,
+		DeviceCertificateChain: asl.DeviceCertificateChain{
+			Path: c.CertificatePath,
+		},
+		PrivateKey: asl.PrivateKey{
+			Path:                c.PrivateKeyPath,
+			AdditionalKeyBuffer: nil,
+		},
+		RootCertificate: asl.RootCertificate{
+			Path: c.ExplicitAnchor,
+		},
+		KeylogFile: "/tmp/keylog.txt",
 	}
 
-	var tlsCerts []tls.Certificate
-	if len(c.Certificates) > 0 && c.PrivateKey != nil {
-		tlsCerts = []tls.Certificate{{PrivateKey: c.PrivateKey, Leaf: c.Certificates[0]}}
-		for i := range c.Certificates {
-			tlsCerts[0].Certificate = append(tlsCerts[0].Certificate, c.Certificates[i].Raw)
-		}
+	endpoint := asl.ASLsetupClientEndpoint(config)
+
+	// Create the custom ASL transport
+	aslTransport := &aslhttpclient.ASLTransport{
+		Endpoint: endpoint,
+		Dialer:   &net.Dialer{Timeout: 30 * time.Second}, // Use custom dialer if needed
 	}
 
 	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:            rootCAs,
-				Certificates:       tlsCerts,
-				InsecureSkipVerify: c.InsecureSkipVerify,
-			},
-			DisableKeepAlives: c.DisableKeepAlives,
-		},
+		Transport: aslTransport,
 	}
 }
