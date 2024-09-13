@@ -22,7 +22,6 @@ import (
 	"golang.org/x/term"
 
 	"github.com/globalsign/pemfile"
-	"github.com/globalsign/tpmkeys"
 )
 
 // config contains configuration options.
@@ -57,7 +56,6 @@ type config struct {
 type privateKey struct {
 	Path string
 	HSM  *hsmKey
-	TPM  *tpmKey
 }
 
 // hsmKey is an HSM-resident private key.
@@ -68,24 +66,9 @@ type hsmKey struct {
 	KeyID       *big.Int `json:"key_id"`
 }
 
-// tpmKey is a TPM-resident private key.
-type tpmKey struct {
-	Device      string   `json:"device"`
-	Persistent  *big.Int `json:"persistent_handle,omitempty"`
-	Storage     *big.Int `json:"storage_handle,omitempty"`
-	EK          *big.Int `json:"ek_handle,omitempty"`
-	KeyPass     string   `json:"key_password"`
-	StoragePass string   `json:"storage_password"`
-	EKPass      string   `json:"ek_password"`
-	EKCerts     string   `json:"ek_certs"`
-	Public      string   `json:"public_area"`
-	Private     string   `json:"private_area"`
-}
-
 const (
 	configDirectoryVar = "ESTCLIENT_CONFIG_DIRECTORY"
 	hsmKeyLabel        = "hsm"
-	tpmKeyLabel        = "tpm"
 )
 
 var (
@@ -261,9 +244,6 @@ func (k *privateKey) Get(baseDir string) (interface{}, func() error, error) {
 
 	case k.HSM != nil:
 		return k.HSM.Get(baseDir)
-
-	case k.TPM != nil:
-		return k.TPM.Get(baseDir)
 	}
 
 	return nil, nil, errNoPrivateKey
@@ -318,42 +298,6 @@ func (k *hsmKey) Get(baseDir string) (key interface{}, closeFunc func() error, e
 	return
 }
 
-// Get returns a private key and a close function.
-func (k *tpmKey) Get(baseDir string) (interface{}, func() error, error) {
-	var key interface{}
-	var err error
-
-	switch {
-	case k.Persistent != nil:
-		key, err = tpmkeys.NewFromPersistentHandle(k.Device, uint32(k.Persistent.Uint64()), k.KeyPass)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get private key: %w", err)
-		}
-
-	case k.Storage != nil:
-		pub, err := os.ReadFile(fullPath(baseDir, k.Public))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read public area: %w", err)
-		}
-
-		priv, err := os.ReadFile(fullPath(baseDir, k.Private))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read private area: %w", err)
-		}
-
-		key, err = tpmkeys.NewFromBlobs(k.Device, uint32(k.Storage.Uint64()), k.StoragePass,
-			pub, priv, k.KeyPass)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get private key: %w", err)
-		}
-
-	default:
-		return nil, nil, errNoPrivateKey
-	}
-
-	return key, func() error { return nil }, nil
-}
-
 // UnmarshalJSON parses a JSON-encoded value and stores the result in the
 // object.
 func (k *privateKey) UnmarshalJSON(b []byte) error {
@@ -387,13 +331,6 @@ func (k *privateKey) UnmarshalJSON(b []byte) error {
 		}
 
 		*k = privateKey{HSM: &s}
-	} else if msg, ok := obj[tpmKeyLabel]; ok {
-		var s tpmKey
-		if err := json.Unmarshal(msg, &s); err != nil {
-			return err
-		}
-
-		*k = privateKey{TPM: &s}
 	} else {
 		return errors.New("unknown private key format")
 	}
@@ -584,8 +521,6 @@ func newConfig(set *flag.FlagSet) (config, error) {
 	var ekCertsPath string
 	if filename, ok := cfg.flags[ekcertsFlag]; ok {
 		ekCertsPath = fullPath(wd, filename)
-	} else if cfg.PrivateKey != nil && cfg.PrivateKey.TPM != nil && cfg.PrivateKey.TPM.EKCerts != "" {
-		ekCertsPath = fullPath(cfg.baseDir, cfg.PrivateKey.TPM.EKCerts)
 	}
 
 	if ekCertsPath != "" {

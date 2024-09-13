@@ -179,12 +179,6 @@ func NewRouter(cfg *ServerConfig) (http.Handler, error) {
 			requireBasicAuth(cfg.CheckBasicAuth, true),
 		).Post(serverkeygenEndpoint, serverkeygen)
 
-		r.With(
-			requireContentType(mimeTypeMultipart),
-		).With(
-			requireBasicAuth(cfg.CheckBasicAuth, true),
-		).Post(tpmenrollEndpoint, tpmenroll)
-
 		// Endpoints with additional path segment.
 		r.Route(fmt.Sprintf("/{%s}", apsParamName), func(r chi.Router) {
 			r.Get(cacertsEndpoint, cacerts)
@@ -215,12 +209,6 @@ func NewRouter(cfg *ServerConfig) (http.Handler, error) {
 			).With(
 				requireBasicAuth(cfg.CheckBasicAuth, true),
 			).Post(serverkeygenEndpoint, serverkeygen)
-
-			r.With(
-				requireContentType(mimeTypeMultipart),
-			).With(
-				requireBasicAuth(cfg.CheckBasicAuth, true),
-			).Post(tpmenrollEndpoint, tpmenroll)
 		})
 	})
 
@@ -396,74 +384,6 @@ func serverkeygen(w http.ResponseWriter, r *http.Request) {
 		[]multipartPart{
 			{contentType: keyContentType, data: key},
 			{contentType: mimeTypePKCS7CertsOnly, data: cert},
-		},
-	)
-	if writeOnError(ctx, w, logMsgMultipartEncodeFailed, err) {
-		return
-	}
-
-	writeResponse(w, contentType, false, buf.Bytes())
-}
-
-// tpmenroll services the /tpmenroll endpoint.
-func tpmenroll(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	aps := chi.URLParam(r, apsParamName)
-
-	// Read and decode request.
-	var csr *x509.CertificateRequest
-	var ekCerts []*x509.Certificate
-	var ekPub []byte
-	var akPub []byte
-
-	_, err := decodeMultipartRequest(
-		r,
-		[]multipartPart{
-			{contentType: mimeTypePKCS10, data: &csr},
-			{contentType: mimeTypePKCS7, data: &ekCerts},
-			{contentType: mimeTypeOctetStream, data: &ekPub},
-			{contentType: mimeTypeOctetStream, data: &akPub},
-		},
-	)
-	if writeOnError(ctx, w, logMsgMultipartDecodeFailed, err) {
-		return
-	}
-
-	// Validate EK public key matches that in the EK certificate. Note that
-	// while the name of the AK (i.e. the hash of the entire AK public area)
-	// will be used to protect the credential, only the name algorithm and
-	// the symmetric encryption algorithm from the EK public area will be used,
-	// so none of the protection depends on the EK public area and in general
-	// it can be manipulated and is unreliable.
-	if err := validatePublicAreaPublicKey(ekPub, ekCerts[0].PublicKey); err != nil {
-		writeOnError(ctx, w, logMsgPublicKeyInvalid, err)
-		return
-	}
-
-	// Note that we could verify if the AK public key matches that in the CSR,
-	// but the TPM device will fail to activate the credential if a matching
-	// key is not on the TPM, so even if we don't verify proof-of-possession,
-	// the TPM privacy-preserving protocol will ensure that certificate can
-	// only be decrypted by a TPM possessing that private key, so we achieve
-	// the same end. Since it's possible a client may request a certificate for
-	// a key which cannot be used for signing CSRs, and since the TPM privacy-
-	// preserving protocol gives us a means to do that securely, we here choose
-	// to allow it, and effectively ignore the public key in the CSR in a
-	// manner similar to /serverkeygen.
-
-	// Request credential blob and encrypted seed from backing CA.
-	credBlob, encSeed, cred, err := caFromContext(ctx).TPMEnroll(ctx, csr, ekCerts, ekPub, akPub, aps, r)
-	if writeOnError(ctx, w, logMsgEnrollFailed, err) {
-		return
-	}
-
-	// Encode and write response.
-	buf, contentType, err := encodeMultiPart(
-		tpmEnrollBoundary,
-		[]multipartPart{
-			{contentType: mimeTypeOctetStream, data: credBlob},
-			{contentType: mimeTypeOctetStream, data: encSeed},
-			{contentType: mimeTypePKCS7Enveloped, data: cred},
 		},
 	)
 	if writeOnError(ctx, w, logMsgMultipartEncodeFailed, err) {

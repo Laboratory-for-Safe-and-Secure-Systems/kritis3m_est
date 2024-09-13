@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/ayham/est"
 	"github.com/ayham/est/internal/db"
-	"github.com/ayham/est/internal/tpm"
 	"go.mozilla.org/pkcs7"
 )
 
@@ -392,41 +390,4 @@ func (ca *RealCA) ServerKeyGen(
 	}
 
 	return cert, retDER, nil
-}
-
-// TPMEnroll requests a new certificate using the TPM 2.0 privacy-preserving
-// protocol. An EK certificate chain with a length of at least one must be
-// provided, along with the EK and AK public areas. The return values are an
-// encrypted credential, a wrapped encryption key, and the certificate itself
-// encrypted with the encrypted credential in AES 128 Galois Counter Mode
-// inside a CMS EnvelopedData structure.
-func (ca *RealCA) TPMEnroll(
-	ctx context.Context,
-	csr *x509.CertificateRequest,
-	ekcerts []*x509.Certificate,
-	ekPub, akPub []byte,
-	aps string,
-	r *http.Request,
-) ([]byte, []byte, []byte, error) {
-	cert, err := ca.Enroll(ctx, csr, aps, r)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	key := make([]byte, 16)
-	if _, err := io.ReadFull(rand.Reader, key); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to generate AES key random bytes: %w", err)
-	}
-
-	blob, secret, err := tpm.MakeCredential(key, ekPub, akPub)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	cred, err := pkcs7.EncryptUsingPSK(cert.Raw, key)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create CMS EnvelopedData: %w", err)
-	}
-
-	return blob, secret, cred, err
 }

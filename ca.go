@@ -42,14 +42,6 @@ type CA interface {
 	// structure which itself is inside a CMS EnvelopedData structure. See
 	// RFC7030 4.4.
 	ServerKeyGen(ctx context.Context, csr *x509.CertificateRequest, aps string, r *http.Request) (*x509.Certificate, []byte, error)
-
-	// TPMEnroll requests a new certificate using the TPM 2.0 privacy-preserving
-	// protocol. An EK certificate chain with a length of at least one must be
-	// provided, along with the EK and AK public areas. The return values are an
-	// encrypted credential blob, an encrypted seed, and the certificate itself
-	// inside a CMS EnvelopedData encrypted with the credential as a pre-shared
-	// key.
-	TPMEnroll(ctx context.Context, csr *x509.CertificateRequest, ekcerts []*x509.Certificate, ekPub, akPub []byte, aps string, r *http.Request) ([]byte, []byte, []byte, error)
 }
 
 // Error represents an error which can be translated into an HTTP
