@@ -152,6 +152,12 @@ func (ca *RealCA) CACerts(
 		return nil, errors.New("triggered error")
 	}
 
+	// save the request to the database
+	err := ca.database.SaveHTTPRequest(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save request: %w", err)
+	}
+
 	return ca.certs, nil
 }
 
@@ -268,6 +274,19 @@ func (ca *RealCA) Enroll(
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify certificate: %w", err)
 	}
+
+  // save the request to the database
+  err = ca.database.SaveHTTPRequest(r)
+  if err != nil {
+    return nil, fmt.Errorf("failed to save request: %w", err)
+  }
+
+
+  // // save the certificate to the database
+  // err = ca.database.SaveCertificate(cert)
+  // if err != nil {
+  //   return nil, fmt.Errorf("failed to save certificate: %w", err)
+  // }
 
 	return cert, nil
 }

@@ -9,8 +9,8 @@ type Certificate struct {
 	gorm.Model
 	SerialNumber  string    `gorm:"unique;not null"`
 	CommonName    string    `gorm:"not null"`
-	Organization  string    `gorm:"not null"`
-	Email         string    `gorm:"not null"`
+	Organizations []string  `gorm:"not null;type:text"`
+	Emails        []string  `gorm:"not null;type:text"`
 	IssuedAt      time.Time `gorm:"not null"`
 	ExpiresAt     time.Time `gorm:"not null"`
 	PublicKey     string    `gorm:"not null;type:text"`
