@@ -11,6 +11,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"unsafe"
+
+	"github.com/ayham/est/internal/alogger"
 )
 
 // KRITIS3MPKI represents the PKI configuration and operations

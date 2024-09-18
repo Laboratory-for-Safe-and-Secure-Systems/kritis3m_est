@@ -14,8 +14,8 @@ import (
 
 	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
 	"github.com/ayham/est"
+	"github.com/ayham/est/internal/alogger"
 	"github.com/ayham/est/internal/aslhttpserver"
-	"github.com/ayham/est/internal/basiclogger"
 	"github.com/ayham/est/internal/realca"
 )
 
@@ -106,13 +106,13 @@ func main() {
 	// Create logger. If no log file was specified, log to standard error.
 	var logger est.Logger
 	if cfg.Logfile == "" {
-		logger = basiclogger.New(os.Stderr)
+		logger = alogger.New(os.Stderr)
 	} else {
 		f, err := os.OpenFile(cfg.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatalf("failed to open log file: %v", err)
 		}
-		logger = basiclogger.New(f)
+		logger = alogger.New(f)
 		defer f.Close()
 	}
 
@@ -144,7 +144,7 @@ func main() {
 			ConnContext: func(ctx context.Context, c net.Conn) context.Context {
 				if aslConn, ok := c.(*aslhttpserver.ASLConn); ok {
 					if aslConn.TLSState != nil {
-            logger.Infof("Setting TLS state in ConnContext")
+						logger.Infof("Setting TLS state in ConnContext")
 						// Attach the TLS state to the context
 						return context.WithValue(ctx, aslhttpserver.TLSStateKey, aslConn.TLSState)
 					}
