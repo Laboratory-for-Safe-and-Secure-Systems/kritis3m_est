@@ -16,9 +16,13 @@ import (
 	"time"
 
 	"github.com/ayham/est"
+	"github.com/ayham/est/internal/alogger"
 	"github.com/ayham/est/internal/db"
+	"github.com/ayham/est/internal/kritis3mpki"
 	"go.mozilla.org/pkcs7"
 )
+
+var bla alogger.Logger
 
 // Global variables.
 var (
@@ -45,7 +49,11 @@ const (
 )
 
 // ASL PKI
-var kritis3mPKI = NewKRITIS3MPKI()
+var kritis3mPKI = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
+	LogLevel:          kritis3mpki.KRITIS3M_PKI_LOG_LEVEL_DBG,
+	LoggingEnabled:    true,
+	CustomLogCallback: nil,
+})
 
 // RealCA is a simple CA implementation that uses a single key pair and
 // certificate to sign requests.
@@ -53,7 +61,7 @@ var kritis3mPKI = NewKRITIS3MPKI()
 type RealCA struct {
 	certs       []*x509.Certificate
 	key         interface{}
-	kritis3mPKI *KRITIS3MPKI
+	kritis3mPKI *kritis3mpki.KRITIS3MPKI
 	database    *db.DB
 }
 
@@ -275,18 +283,17 @@ func (ca *RealCA) Enroll(
 		return nil, fmt.Errorf("failed to verify certificate: %w", err)
 	}
 
-  // save the request to the database
-  err = ca.database.SaveHTTPRequest(r)
-  if err != nil {
-    return nil, fmt.Errorf("failed to save request: %w", err)
-  }
+	// save the request to the database
+	err = ca.database.SaveHTTPRequest(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save request: %w", err)
+	}
 
-
-  // // save the certificate to the database
-  // err = ca.database.SaveCertificate(cert)
-  // if err != nil {
-  //   return nil, fmt.Errorf("failed to save certificate: %w", err)
-  // }
+	// // save the certificate to the database
+	// err = ca.database.SaveCertificate(cert)
+	// if err != nil {
+	//   return nil, fmt.Errorf("failed to save certificate: %w", err)
+	// }
 
 	return cert, nil
 }

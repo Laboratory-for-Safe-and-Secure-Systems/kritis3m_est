@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/x509"
 	"encoding/json"
 	"errors"
@@ -19,13 +18,16 @@ import (
 
 	"github.com/ThalesIgnite/crypto11"
 	"github.com/ayham/est"
-	"github.com/ayham/est/internal/realca"
+	"github.com/ayham/est/internal/kritis3mpki"
 	"golang.org/x/term"
 
 	"github.com/globalsign/pemfile"
 )
 
-var kritis3mPKI = realca.NewKRITIS3MPKI()
+var kritis3mPKI = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
+	LogLevel:       kritis3mpki.KRITIS3M_PKI_LOG_LEVEL_DBG,
+	LoggingEnabled: true,
+})
 
 // config contains configuration options.
 type config struct {
@@ -147,14 +149,16 @@ func (cfg *config) GenerateCSR(key interface{}) (*x509.CertificateRequest, error
 		return nil, fmt.Errorf("failed to generate certificate request template: %v", err)
 	}
 
-	der, err := x509.CreateCertificateRequest(rand.Reader, tmpl, key)
+	err = kritis3mPKI.CreateCSR(kritis3mpki.SigningRequestMetadata{
+		CSR: tmpl,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate request: %v", err)
 	}
 
-	csr, err := x509.ParseCertificateRequest(der)
+	csr, err := kritis3mPKI.FinalizeCSR()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse certificate request: %v", err)
+		return nil, fmt.Errorf("failed to finalize certificate request: %v", err)
 	}
 
 	return csr, nil
@@ -238,8 +242,8 @@ func (cfg *config) CSRTemplate() (*x509.CertificateRequest, error) {
 func (k *privateKey) Get(baseDir string) (interface{}, func() error, error) {
 	switch {
 	case k.Path != "":
-    var key interface{}
-    keyData, err := os.ReadFile(fullPath(baseDir, k.Path))
+		var key interface{}
+		keyData, err := os.ReadFile(fullPath(baseDir, k.Path))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read key file: %w", err)
 		}
@@ -249,7 +253,7 @@ func (k *privateKey) Get(baseDir string) (interface{}, func() error, error) {
 			return nil, nil, fmt.Errorf("failed to load private key: %w", err)
 		}
 
-    key = keyData
+		key = keyData
 
 		return key, func() error { return nil }, nil
 
