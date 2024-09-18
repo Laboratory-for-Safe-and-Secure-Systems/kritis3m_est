@@ -1,22 +1,40 @@
 package db
 
 import (
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
+)
+
+// List of models used in the application
+var modelTypes = []interface{}{
+	Certificate{},
+	CSR{},
+	Revocation{},
+	HTTPRequest{},
+}
+
+// enum for CertificateStatus
+type CertificateStatus string
+
+const (
+	CertificateStatusPending CertificateStatus = "pending"
+	CertificateStatusActive  CertificateStatus = "active"
+	CertificateStatusRevoked CertificateStatus = "revoked"
 )
 
 type Certificate struct {
 	gorm.Model
-	SerialNumber  string    `gorm:"unique;not null"`
-	CommonName    string    `gorm:"not null"`
-	Organizations []string  `gorm:"not null;type:text"`
-	Emails        []string  `gorm:"not null;type:text"`
-	IssuedAt      time.Time `gorm:"not null"`
-	ExpiresAt     time.Time `gorm:"not null"`
-	PublicKey     string    `gorm:"not null;type:text"`
-	PrivateKey    string    `gorm:"not null;type:text"`
-	SignatureAlgo string    `gorm:"not null"`
-	Status        string    `gorm:"not null"`
+	SerialNumber  string            `gorm:"unique;not null"`
+	CommonName    string            `gorm:"not null"`
+	Organizations []string          `gorm:"not null;type:text"`
+	Emails        []string          `gorm:"not null;type:text"`
+	IssuedAt      time.Time         `gorm:"not null"`
+	ExpiresAt     time.Time         `gorm:"not null"`
+	PublicKey     string            `gorm:"not null;type:text"`
+	PrivateKey    string            `gorm:"not null;type:text"`
+	SignatureAlgo string            `gorm:"not null"`
+	Status        CertificateStatus `gorm:"not null"`
 	RevokedAt     time.Time
 }
 
