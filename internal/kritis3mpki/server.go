@@ -37,8 +37,6 @@ func (s *KRITIS3MPKI) CreateCertificate(csrData []byte, validity int, isCA bool)
 		return fmt.Errorf("failed to encode CSR to PEM")
 	}
 
-	fmt.Println("PEM CSR: ", string(pemCSR))
-
 	s.OutputCert = C.outputCert_new()
 	ret := C.outputCert_initFromCsr(s.OutputCert, (*C.uint8_t)(unsafe.Pointer(&pemCSR[0])), C.size_t(len(pemCSR)))
 	if ret != C.KRITIS3M_PKI_SUCCESS {

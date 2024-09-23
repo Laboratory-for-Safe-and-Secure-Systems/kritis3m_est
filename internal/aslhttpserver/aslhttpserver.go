@@ -188,8 +188,7 @@ func (srv *ASLServer) ListenAndServeASLTLS() error {
 		endpoint:    srv.ASLTLSEndpoint,
 	}
 
-	// Log the server start event
-	log.Printf("ASLServer listening on %s", srv.Addr)
+  log.Printf("\033[1;32mStarting ASL server on %s\033[0m", address)
 
 	// Serve the HTTP requests using the custom ASL listener
 	return srv.Serve(aslListener)

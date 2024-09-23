@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"log"
+	"os"
 	"reflect"
 
 	"github.com/ayham/est/internal/alogger"
@@ -19,7 +20,7 @@ type DB struct {
 func NewDB(dbType string, dsn string) (*DB, error) {
 	var db *gorm.DB
 	var err error
-	estLogger := alogger.New(log.Writer())
+	estLogger := alogger.New(os.Stderr)
 	logger := alogger.NewGormLogger(estLogger)
 
 	// Connect to the appropriate database based on the dbType

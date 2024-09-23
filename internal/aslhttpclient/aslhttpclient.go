@@ -89,10 +89,10 @@ func (t *ASLTransport) DialContext(ctx context.Context, network, addr string) (n
 		aslSession: aslSession,
 	}
 
-  err = asl.ASLHandshake(aslConn.aslSession)
-  if err != nil {
-    return nil, fmt.Errorf("ASL handshake failed: %v", err)
-  }
+	err = asl.ASLHandshake(aslConn.aslSession)
+	if err != nil {
+		return nil, fmt.Errorf("ASL handshake failed: %v", err)
+	}
 
 	// // Set a context for the handshake with a timeout
 	// handshakeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)

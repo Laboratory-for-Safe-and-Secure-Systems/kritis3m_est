@@ -25,7 +25,7 @@ import (
 )
 
 var kritis3mPKI = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
-	LogLevel:       kritis3mpki.KRITIS3M_PKI_LOG_LEVEL_DBG,
+	LogLevel:       kritis3mpki.KRITIS3M_PKI_LOG_LEVEL_INF,
 	LoggingEnabled: true,
 })
 

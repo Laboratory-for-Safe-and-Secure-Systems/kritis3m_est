@@ -144,7 +144,6 @@ func main() {
 			ConnContext: func(ctx context.Context, c net.Conn) context.Context {
 				if aslConn, ok := c.(*aslhttpserver.ASLConn); ok {
 					if aslConn.TLSState != nil {
-						logger.Infof("Setting TLS state in ConnContext")
 						// Attach the TLS state to the context
 						return context.WithValue(ctx, aslhttpserver.TLSStateKey, aslConn.TLSState)
 					}
