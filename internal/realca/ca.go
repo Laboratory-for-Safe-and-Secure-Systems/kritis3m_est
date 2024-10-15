@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ayham/est"
@@ -26,7 +27,7 @@ import (
 	"go.mozilla.org/pkcs7"
 )
 
-var bla alogger.Logger
+var logger = alogger.New(os.Stderr)
 
 // Global variables.
 var (
@@ -54,9 +55,8 @@ const (
 
 // ASL PKI
 var kritis3mPKI = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
-	LogLevel:          kritis3mpki.KRITIS3M_PKI_LOG_LEVEL_DBG,
-	LoggingEnabled:    true,
-	CustomLogCallback: nil,
+	LogLevel:       kritis3mpki.KRITIS3M_PKI_LOG_LEVEL_DBG,
+	LoggingEnabled: true,
 })
 
 // RealCA is a simple CA implementation that uses a single key pair and
@@ -287,17 +287,44 @@ func (ca *RealCA) Enroll(
 		return nil, fmt.Errorf("failed to verify certificate: %w", err)
 	}
 
+	// Use the hex serial for database operations
+	hexSerialString := strings.ToUpper(cert.SerialNumber.Text(16))
+	logger.Debugf("Serial number: %s", hexSerialString)
+	subjectFromDB, found := ca.database.GetSubject(cert.Subject.CommonName)
+	logger.Debugf("Subject from DB: %v", subjectFromDB.CommonName)
+
+	if found {
+		err = ca.database.UpdateSubject(cert.Subject.CommonName, map[string]interface{}{
+			"reenrolled":     true,
+			"reenrolled_at":  time.Now(),
+			"reenroll_count": subjectFromDB.ReenrollCount + 1,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to update certificate: %w", err)
+		}
+
+		err = ca.database.SaveCertificateFromSubject(cert.Subject.CommonName, *cert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save certificate: %w", err)
+		}
+
+		logger.Infof("Certificate reenrolled for %s with serial number %s", cert.Subject.CommonName, hexSerialString)
+
+		ca.database.DisablePreviousCerts(cert.Subject.CommonName, hexSerialString)
+
+		logger.Debugf("Revoking previous certificates for %s", cert.Subject.CommonName)
+	} else {
+		err = ca.database.SaveCertificateFromSubject(cert.Subject.CommonName, *cert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save certificate: %w", err)
+		}
+	}
+
 	// save the request to the database
 	err = ca.database.SaveHTTPRequest(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save request: %w", err)
 	}
-
-	// // save the certificate to the database
-	// err = ca.database.SaveCertificate(cert)
-	// if err != nil {
-	//   return nil, fmt.Errorf("failed to save certificate: %w", err)
-	// }
 
 	return cert, nil
 }

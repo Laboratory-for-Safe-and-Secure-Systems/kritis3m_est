@@ -8,6 +8,7 @@ import (
 
 // List of models used in the application
 var modelTypes = []interface{}{
+	Subject{},
 	Certificate{},
 	CSR{},
 	Revocation{},
@@ -23,19 +24,30 @@ const (
 	CertificateStatusRevoked CertificateStatus = "revoked"
 )
 
+type Subject struct {
+	gorm.Model
+	CommonName    string        `gorm:"unique;not null"`
+	Reenrolled    bool          `gorm:"not null;default:false"`
+	ReenrolledAt  time.Time     `gorm:"default:null"`
+	ReenrollCount int           `gorm:"not null;default:0"`
+	Revoked       bool          `gorm:"not null;default:false"`
+	RevokedAt     time.Time     `gorm:"default:null"`
+	RevokedReason string        `gorm:"default:null"`
+	Certificates  []Certificate `gorm:"foreignKey:CommonName;references:CommonName"`
+	CSRs          []CSR         `gorm:"foreignKey:CommonName;references:CommonName"`
+}
+
 type Certificate struct {
 	gorm.Model
 	SerialNumber  string            `gorm:"unique;not null"`
 	CommonName    string            `gorm:"not null"`
-	Organizations []string          `gorm:"not null;type:text"`
-	Emails        []string          `gorm:"not null;type:text"`
+	Organization  string            `gorm:"not null;type:text"`
 	IssuedAt      time.Time         `gorm:"not null"`
 	ExpiresAt     time.Time         `gorm:"not null"`
-	PublicKey     string            `gorm:"not null;type:text"`
-	PrivateKey    string            `gorm:"not null;type:text"`
 	SignatureAlgo string            `gorm:"not null"`
 	Status        CertificateStatus `gorm:"not null"`
-	RevokedAt     time.Time
+	RevokedAt     time.Time         `gorm:"default:null"`
+	RevokedReason string            `gorm:"default:null"`
 }
 
 type CSR struct {
@@ -55,6 +67,7 @@ type Revocation struct {
 	CertificateID uint      `gorm:"not null"`
 	Reason        string    `gorm:"not null"`
 	RevokedAt     time.Time `gorm:"not null"`
+	Certificate   Certificate
 }
 
 type HTTPRequest struct {
