@@ -151,6 +151,8 @@ func NewRouter(cfg *ServerConfig) (http.Handler, error) {
 		requireBasicAuth(cfg.CheckBasicAuth, false),
 	).Get("/healthcheck", healthcheck)
 
+	r.With().Get("/request", getRevocationList)
+
 	// EST endpoints.
 	r.Route(estPathPrefix, func(r chi.Router) {
 		r.Get(cacertsEndpoint, cacerts)
@@ -163,6 +165,14 @@ func NewRouter(cfg *ServerConfig) (http.Handler, error) {
 		).With(
 			requireBasicAuth(cfg.CheckBasicAuth, true),
 		).Post(enrollEndpoint, enroll)
+
+		r.With(
+			requireContentType(mimeTypePKCS7),
+		).With(
+			requireTransferEncoding(encodingTypeBase64),
+		).With(
+			requireBasicAuth(cfg.CheckBasicAuth, true),
+		).Get("/.well-known/est/request", getRevocationList)
 
 		r.With(
 			requireContentType(mimeTypePKCS10),
@@ -304,6 +314,12 @@ func enroll(w http.ResponseWriter, r *http.Request) {
 		// requests but does not verify.
 		cert := r.TLS.PeerCertificates[0]
 
+    // Compare public key fields.
+    if !bytes.Equal(csr.RawSubjectPublicKeyInfo, cert.RawSubjectPublicKeyInfo) {
+      http.Error(w, "Public key in CSR does not match public key in client certificate", http.StatusBadRequest)
+      return
+    }
+
 		// Compare Subject fields.
 		if !bytes.Equal(csr.RawSubject, cert.RawSubject) {
 			errSubjectChanged.Write(w)
@@ -343,6 +359,7 @@ func enroll(w http.ResponseWriter, r *http.Request) {
 	// Request certificate from backing CA.
 	var cert *x509.Certificate
 	if renew {
+		csr.Subject.SerialNumber = r.TLS.PeerCertificates[0].SerialNumber.String()
 		cert, err = caFromContext(ctx).Reenroll(ctx, r.TLS.PeerCertificates[0], csr, aps, r)
 	} else {
 		cert, err = caFromContext(ctx).Enroll(ctx, csr, aps, r)
@@ -394,6 +411,21 @@ func serverkeygen(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, contentType, false, buf.Bytes())
+}
+
+func getRevocationList(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get the CRL from the CA
+	crl, err := caFromContext(ctx).RevocationList(ctx, r)
+	if err != nil {
+		http.Error(w, "Failed to get revocation list", http.StatusInternalServerError)
+		fmt.Printf("Failed to get revocation list: %v", err)
+		return
+	}
+
+	// Write the response.
+	writeResponse(w, "application/pkcs7-mime", true, crl)
 }
 
 // writeOnError writes returns true and writes an error to the provided HTTP

@@ -1,15 +1,19 @@
 package realca
 
 import (
+	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"strconv"
@@ -248,7 +252,7 @@ func (ca *RealCA) Enroll(
 	}
 
 	// Create certificate using aslPKI
-	err := kritis3mPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration.Hours()/24), false)
+	err := kritis3mPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
@@ -416,4 +420,64 @@ func (ca *RealCA) ServerKeyGen(
 	}
 
 	return cert, retDER, nil
+}
+
+func (ca *RealCA) RevocationList(ctx context.Context, r *http.Request) ([]byte, error) {
+	revokedCerts, found := ca.database.GetRevocations()
+	if !found {
+		return nil, fmt.Errorf("failed to get revoked certificates")
+	}
+	if len(revokedCerts) == 0 {
+		return nil, nil
+	}
+
+	revokedCertificates := make([]pkix.RevokedCertificate, len(revokedCerts))
+	for i, cert := range revokedCerts {
+		serialNumber, err := new(big.Int).SetString(cert.SerialNumber, 16)
+		if !err {
+			return nil, fmt.Errorf("failed to parse serial number")
+		}
+		revokedCertificates[i] = pkix.RevokedCertificate{
+			SerialNumber:   serialNumber,
+			RevocationTime: cert.RevokedAt,
+		}
+	}
+
+	// Create a new RevocationList
+	revocationList := &x509.RevocationList{
+		RevokedCertificates: revokedCertificates,
+		Number:              big.NewInt(time.Now().Unix()),
+		ThisUpdate:          time.Now(),
+		NextUpdate:          time.Now().Add(time.Hour * 24),
+	}
+
+	// PEM to DER
+	block, _ := pem.Decode(ca.key.([]byte))
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM data")
+	}
+
+	// Load Key from PEM -> ca.key.(*ecdsa.PrivateKey)
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	// Compare the public key in the certificate with the public key in the private key
+	if !bytes.Equal(ca.certs[0].PublicKey.(*ecdsa.PublicKey).X.Bytes(), key.(*ecdsa.PrivateKey).PublicKey.X.Bytes()) {
+		return nil, fmt.Errorf("public key in the certificate does not match the public key in the private key")
+	}
+
+	list, err := x509.CreateRevocationList(rand.Reader, revocationList, ca.certs[0], key.(*ecdsa.PrivateKey))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create revocation list: %w", err)
+	}
+
+	// Save the request to the database
+	if err := ca.database.SaveHTTPRequest(r); err != nil {
+		log.Printf("Failed to save HTTP request: %v", err)
+	}
+
+	return list, nil
 }

@@ -42,6 +42,9 @@ type CA interface {
 	// structure which itself is inside a CMS EnvelopedData structure. See
 	// RFC7030 4.4.
 	ServerKeyGen(ctx context.Context, csr *x509.CertificateRequest, aps string, r *http.Request) (*x509.Certificate, []byte, error)
+
+  // Revokation List
+  RevocationList(ctx context.Context, r *http.Request) ([]byte, error)
 }
 
 // Error represents an error which can be translated into an HTTP
