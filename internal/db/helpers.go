@@ -322,3 +322,35 @@ func (db *DB) DisablePreviousCerts(commonName string, serialNumber string) error
 		return nil
 	})
 }
+
+// GetCertificates returns all certificates from the database
+func (db *DB) GetCertificates() []Certificate {
+  var certificates []Certificate
+  result := db.conn.Find(&certificates)
+  if result.Error != nil {
+    logger.Errorf("Failed to find certificates: %v", result.Error)
+    return nil
+  }
+
+  if len(certificates) == 0 {
+    logger.Infof("No certificates found")
+  }
+
+  return certificates
+}
+
+// GetSubjects returns all subjects from the database
+func (db *DB) GetSubjects() []Subject {
+  var subjects []Subject
+  result := db.conn.Find(&subjects)
+  if result.Error != nil {
+    logger.Errorf("Failed to find subjects: %v", result.Error)
+    return nil
+  }
+
+  if len(subjects) == 0 {
+    logger.Infof("No subjects found")
+  }
+
+  return subjects
+}

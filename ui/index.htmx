@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/htmx.org"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Real-Time Updates with WebSocket - Debug Version</title>
+  </head>
+  <body class="bg-gray-100 p-6">
+    <h1 class="text-3xl font-bold text-center mb-6">Enrolled Certs</h1>
+    <div id="data-container" class="mx-auto bg-white border border-gray-600 rounded-2xl shadow-lg overflow-x-auto mb-6">
+      <table class="min-w-full p-4 table-auto" id="table-body" hx-get="/data" hx-trigger="load" hx-swap="innerHTML">
+        <tbody class="divide-y divide-gray-200">
+          <tr>
+            <td colspan="3" class="text-center py-4 text-gray-500">No data available</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Bar Chart Container -->
+    <div class="max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+      <canvas id="certificatesChart" width="400" height="200"></canvas>
+    </div>
+    <!-- Debug Info Container / scrolabale with fixed height -->
+    <div id="debug-info" class="bg-gray-200 p-4 rounded-lg mb-6 max-h-48 overflow-y-auto">
+      <h2 class="text-xl font-bold mb-2">Debug Information</h2>
+      <pre id="debug-log" class="whitespace-pre-wrap"></pre>
+    </div>
+    <script>
+      // Debug logging function
+      function debugLog(message) {
+        console.log(message);
+        const debugElement = document.getElementById('debug-log');
+        debugElement.textContent += message + '\n';
+      }
+
+      // Establish a WebSocket connection
+      var socket = new WebSocket("ws://localhost:8080/ws");
+      socket.onopen = function(event) {
+        debugLog("WebSocket connection opened");
+      };
+      socket.onmessage = function(event) {
+        debugLog("WebSocket message received");
+        htmx.ajax("GET", "/data", {target: "#table-body"});
+        fetchChartData();
+      };
+      socket.onclose = function(event) {
+        debugLog("WebSocket closed: " + JSON.stringify(event));
+      };
+      socket.onerror = function(error) {
+        debugLog("WebSocket error: " + JSON.stringify(error));
+      };
+
+      // Chart.js initialization
+      const ctx = document.getElementById('certificatesChart').getContext('2d');
+      const certificatesChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Certificates', 'Subjects'],
+          datasets: [{
+            axis: 'y',
+            data: [0, 0],
+            backgroundColor: ['#4F46E5', '#F87171'],
+            label: 'Count'
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Count'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.label}: ${context.formattedValue}`;
+                }
+              }
+            }
+          },
+        }
+      });
+
+      // Function to update the chart with data
+      function updateChart(certCount, subjectCount) {
+        debugLog(`Updating chart with: Certificates=${certCount}, Subjects=${subjectCount}`);
+        certificatesChart.data.datasets[0].data = [certCount, subjectCount];
+
+        certificatesChart.update();
+        debugLog("Chart update called");
+      }
+
+      // Function to fetch chart data and update chart
+      function fetchChartData() {
+        debugLog("Fetching chart data");
+        fetch('/chart-data')
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            return response.json();
+          })
+          .then(data => {
+            debugLog("Chart data received: " + JSON.stringify(data));
+            if (data && 'certificates' in data && 'subjects' in data) {
+              updateChart(data.certificates, data.subjects);
+            } else {
+              debugLog("Error: Unexpected data format");
+            }
+          })
+          .catch(error => {
+            debugLog("Error fetching chart data: " + error.message);
+          });
+      }
+
+      // Initial chart data fetch
+      debugLog("Initial chart data fetch");
+      fetchChartData();
+    </script>
+  </body>
+</html>
