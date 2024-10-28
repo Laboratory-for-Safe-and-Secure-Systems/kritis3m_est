@@ -136,7 +136,7 @@ func (cfg *config) MakeClient() (*est.Client, error) {
 
 // GenerateCSR generates a certificate signing request. If the argument is
 // nil, the private key from the configuration will be used.
-func (cfg *config) GenerateCSR(key interface{}) (*x509.CertificateRequest, error) {
+func (cfg *config) GenerateCSR(key interface{}, tmpl *x509.CertificateRequest) (*x509.CertificateRequest, error) {
 	if key == nil {
 		if cfg.openPrivateKey == nil {
 			return nil, errNoPrivateKey
@@ -144,9 +144,12 @@ func (cfg *config) GenerateCSR(key interface{}) (*x509.CertificateRequest, error
 		key = cfg.openPrivateKey
 	}
 
-	tmpl, err := cfg.CSRTemplate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate certificate request template: %v", err)
+	var err error
+	if tmpl == nil {
+		tmpl, err = cfg.CSRTemplate()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate certificate request template: %v", err)
+		}
 	}
 
 	err = kritis3mPKI.CreateCSR(kritis3mpki.SigningRequestMetadata{

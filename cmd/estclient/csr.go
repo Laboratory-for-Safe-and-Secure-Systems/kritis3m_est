@@ -36,7 +36,7 @@ func csr(w io.Writer, set *flag.FlagSet) error {
 		}
 	}()
 
-	csr, err := cfg.GenerateCSR(nil)
+	csr, err := cfg.GenerateCSR(nil, nil)
 	if err != nil {
 		return err
 	}

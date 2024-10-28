@@ -95,16 +95,7 @@ func enrollCommon(w io.Writer, set *flag.FlagSet, renew, keygen bool) error {
 				}
 			}
 
-			// Construct the certificate request from the template.
-			der, err := x509.CreateCertificateRequest(rand.Reader, tmpl, cfg.openPrivateKey)
-			if err != nil {
-				return fmt.Errorf("failed to create certificate request: %v", err)
-			}
-
-			csr, err = x509.ParseCertificateRequest(der)
-			if err != nil {
-				return fmt.Errorf("failed to parse certificate request: %v", err)
-			}
+			csr, err = cfg.GenerateCSR(nil, tmpl)
 		} else {
 			if keygen {
 				var csrkey *ecdsa.PrivateKey
@@ -112,9 +103,9 @@ func enrollCommon(w io.Writer, set *flag.FlagSet, renew, keygen bool) error {
 				if err != nil {
 					return fmt.Errorf("failed to generate temporary private key: %v", err)
 				}
-				csr, err = cfg.GenerateCSR(csrkey)
+				csr, err = cfg.GenerateCSR(csrkey, nil)
 			} else {
-				csr, err = cfg.GenerateCSR(nil)
+				csr, err = cfg.GenerateCSR(nil, nil)
 			}
 			if err != nil {
 				return fmt.Errorf("failed to create certificate request: %v", err)
