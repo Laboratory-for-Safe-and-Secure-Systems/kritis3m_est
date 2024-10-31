@@ -1,6 +1,6 @@
 module github.com/ayham/est
 
-go 1.22.1
+go 1.23
 
 require (
 	github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl v1.0.2
