@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 	"github.com/ayham/est/internal/aslhttpclient"
 )
 

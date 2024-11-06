@@ -20,7 +20,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 )
 
 func main() {

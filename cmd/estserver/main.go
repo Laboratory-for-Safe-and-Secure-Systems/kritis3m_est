@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 	"github.com/ayham/est"
 	"github.com/ayham/est/internal/alogger"
 	"github.com/ayham/est/internal/aslhttpserver"

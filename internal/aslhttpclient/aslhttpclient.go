@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 )
 
 // ASLConn wraps the TCPConn and ASLSession (same as in the server)

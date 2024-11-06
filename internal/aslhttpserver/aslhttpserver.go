@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	asl "github.com/Laboratory-for-Safe-and-Secure-Systems/go-wolfssl/asl"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 )
 
 // ASLServer struct that embeds http.Server and uses custom ASL TLS listener
