@@ -24,7 +24,7 @@ type KRITIS3MPKIError struct {
 	Message string
 }
 
-type CustomLogCallback C.kritis3m_pki_custom_log_callback
+type CustomLogCallback C.kritis3m_pki_log_callback
 
 // KRITIS3MPKIConfiguration represents the PKI configuration
 type KRITIS3MPKIConfiguration struct {
@@ -45,9 +45,9 @@ type KRITIS3MPKI struct {
 
 func (pc *KRITIS3MPKIConfiguration) toC() *C.kritis3m_pki_configuration {
 	return &C.kritis3m_pki_configuration{
-		log_level:           C.int(pc.LogLevel),
-		logging_enabled:     C.bool(pc.LoggingEnabled),
-		custom_log_callback: (C.kritis3m_pki_custom_log_callback)(pc.CustomLogCallback),
+		log_level:       C.int(pc.LogLevel),
+		logging_enabled: C.bool(pc.LoggingEnabled),
+		log_callback:    (C.kritis3m_pki_log_callback)(pc.CustomLogCallback),
 	}
 }
 
@@ -108,7 +108,7 @@ func InitPKI(config *KRITIS3MPKIConfiguration) *KRITIS3MPKI {
 
 	return &KRITIS3MPKI{
 		Configuration: config,
-    Error: &KRITIS3MPKIError{},
+		Error:         &KRITIS3MPKIError{},
 	}
 }
 
