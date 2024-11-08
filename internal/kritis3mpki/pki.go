@@ -13,7 +13,7 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/ayham/est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/alogger"
 )
 
 var logger = alogger.New(os.Stderr)

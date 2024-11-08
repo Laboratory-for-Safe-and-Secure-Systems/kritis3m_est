@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/kritis3mpki"
 	"github.com/ThalesIgnite/crypto11"
-	"github.com/ayham/est"
-	"github.com/ayham/est/internal/kritis3mpki"
 	"golang.org/x/term"
 
 	"github.com/globalsign/pemfile"

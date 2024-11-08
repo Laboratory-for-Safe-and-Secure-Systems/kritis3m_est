@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ayham/est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/alogger"
 	"gorm.io/gorm"
 )
 
@@ -282,7 +282,7 @@ func (db *DB) DisablePreviousCerts(commonName string, serialNumber string) error
 
 	// Transaction to disable all previous certificates
 	return db.conn.Transaction(func(tx *gorm.DB) error {
-    err := tx.Where("common_name = ? AND status = ?", commonName, CertificateStatusActive).
+		err := tx.Where("common_name = ? AND status = ?", commonName, CertificateStatusActive).
 			Order("issued_at desc").First(&lastCert).Error
 		if err != nil {
 			logger.Errorf("Failed to find last certificate: %v", err)
@@ -325,32 +325,32 @@ func (db *DB) DisablePreviousCerts(commonName string, serialNumber string) error
 
 // GetCertificates returns all certificates from the database
 func (db *DB) GetCertificates() []Certificate {
-  var certificates []Certificate
-  result := db.conn.Find(&certificates)
-  if result.Error != nil {
-    logger.Errorf("Failed to find certificates: %v", result.Error)
-    return nil
-  }
+	var certificates []Certificate
+	result := db.conn.Find(&certificates)
+	if result.Error != nil {
+		logger.Errorf("Failed to find certificates: %v", result.Error)
+		return nil
+	}
 
-  if len(certificates) == 0 {
-    logger.Infof("No certificates found")
-  }
+	if len(certificates) == 0 {
+		logger.Infof("No certificates found")
+	}
 
-  return certificates
+	return certificates
 }
 
 // GetSubjects returns all subjects from the database
 func (db *DB) GetSubjects() []Subject {
-  var subjects []Subject
-  result := db.conn.Find(&subjects)
-  if result.Error != nil {
-    logger.Errorf("Failed to find subjects: %v", result.Error)
-    return nil
-  }
+	var subjects []Subject
+	result := db.conn.Find(&subjects)
+	if result.Error != nil {
+		logger.Errorf("Failed to find subjects: %v", result.Error)
+		return nil
+	}
 
-  if len(subjects) == 0 {
-    logger.Infof("No subjects found")
-  }
+	if len(subjects) == 0 {
+		logger.Infof("No subjects found")
+	}
 
-  return subjects
+	return subjects
 }

@@ -9,8 +9,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/ayham/est/internal/alogger"
-	"github.com/ayham/est/internal/db"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/db"
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -45,7 +45,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			delete(clients, ws)
 			break
 		}
-    logger.Infof("Received message: %s", string(msg))
+		logger.Infof("Received message: %s", string(msg))
 	}
 }
 
@@ -85,7 +85,7 @@ func generateDynamicTemplate(data []db.Certificate) (string, error) {
 				if strings.Contains(field.Name, "At") && fieldValue.Type() == reflect.TypeOf(time.Time{}) {
 					t := fieldValue.Interface().(time.Time)
 					// Format the time and add it to the row
-          // paddinf 12px all around
+					// paddinf 12px all around
 					row = append(row, fmt.Sprintf("<td class=\"text-center p-3 text-gray-500\">%s</td>", t.Format("2006-01-02 15:04:05")))
 				} else {
 					// For non-time fields, just add the value
@@ -110,7 +110,7 @@ func handleData(w http.ResponseWriter, _ *http.Request, newDB *db.DB) {
 	t, err := template.New("tableRows").Parse(tmpl)
 	if err != nil {
 		http.Error(w, "Error rendering template", http.StatusInternalServerError)
-    logger.Errorf("Failed to parse template: %v", err)
+		logger.Errorf("Failed to parse template: %v", err)
 		return
 	}
 
@@ -118,7 +118,7 @@ func handleData(w http.ResponseWriter, _ *http.Request, newDB *db.DB) {
 	w.Header().Set("Content-Type", "text/html")
 	if err := t.Execute(w, certs); err != nil {
 		http.Error(w, "Error executing template", http.StatusInternalServerError)
-    logger.Errorf("Failed to execute template: %v", err)
+		logger.Errorf("Failed to execute template: %v", err)
 	}
 }
 
@@ -129,7 +129,7 @@ func broadcastMessages() {
 		for client := range clients {
 			err := client.WriteMessage(websocket.TextMessage, []byte(msg))
 			if err != nil {
-        logger.Errorf("Failed to write message: %v", err)
+				logger.Errorf("Failed to write message: %v", err)
 				client.Close()
 				delete(clients, client)
 			}
@@ -165,13 +165,13 @@ func main() {
 		handleData(w, r, newDB)
 	})
 
-  http.HandleFunc("/chart-data", func(w http.ResponseWriter, r *http.Request) {
-    // mock data json with two properties "certificates" and "subjects"
-    certs := newDB.GetCertificates()
-    subjects := newDB.GetSubjects()
-    w.Header().Set("Content-Type", "application/json")
-    w.Write([]byte(`{"certificates": ` + fmt.Sprintf("%d", len(certs)) + `, "subjects": ` + fmt.Sprintf("%d", len(subjects)) + `}`))
-  })
+	http.HandleFunc("/chart-data", func(w http.ResponseWriter, r *http.Request) {
+		// mock data json with two properties "certificates" and "subjects"
+		certs := newDB.GetCertificates()
+		subjects := newDB.GetSubjects()
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"certificates": ` + fmt.Sprintf("%d", len(certs)) + `, "subjects": ` + fmt.Sprintf("%d", len(subjects)) + `}`))
+	})
 
 	// Start broadcasting messages
 	go broadcastMessages()
@@ -180,9 +180,9 @@ func main() {
 	go watchForDatabaseChanges()
 
 	// Start the server
-  logger.Infof("Starting server on :8080")
+	logger.Infof("Starting server on :8080")
 	err = http.ListenAndServe(":8080", nil)
 	if err != nil {
-    logger.Errorf("Failed to start server: %v", err)
+		logger.Errorf("Failed to start server: %v", err)
 	}
 }

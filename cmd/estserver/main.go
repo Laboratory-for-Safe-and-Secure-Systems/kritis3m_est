@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/aslhttpserver"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/realca"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
-	"github.com/ayham/est"
-	"github.com/ayham/est/internal/alogger"
-	"github.com/ayham/est/internal/aslhttpserver"
-	"github.com/ayham/est/internal/realca"
 )
 
 const (

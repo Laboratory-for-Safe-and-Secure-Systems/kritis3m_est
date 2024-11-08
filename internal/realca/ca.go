@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ayham/est"
-	"github.com/ayham/est/internal/alogger"
-	"github.com/ayham/est/internal/db"
-	"github.com/ayham/est/internal/kritis3mpki"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/db"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/kritis3mpki"
 	"go.mozilla.org/pkcs7"
 )
 

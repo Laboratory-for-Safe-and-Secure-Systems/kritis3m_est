@@ -1,4 +1,4 @@
-module github.com/ayham/est
+module github.com/Laboratory-for-Safe-and-Secure-Systems/est
 
 go 1.23
 

@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/aslhttpclient"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
-	"github.com/ayham/est/internal/aslhttpclient"
 )
 
 // Client is an EST client implementing the Enrollment over Secure Transport
@@ -103,7 +103,7 @@ type Client struct {
 // Client constants.
 const (
 	estVersion = "v1.0.6"
-	userAgent  = "KRITS3M EST Client " + estVersion + " github.com/ayham/est"
+	userAgent  = "KRITS3M EST Client " + estVersion + " github.com/Laboratory-for-Safe-and-Secure-Systems/est"
 )
 
 // CACerts requests a copy of the current CA certificates.

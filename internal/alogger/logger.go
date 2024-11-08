@@ -20,7 +20,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/ayham/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/est"
 	"github.com/rs/zerolog"
 )
 
