@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"net/http"
 	"os"
@@ -28,7 +29,9 @@ var upgrader = websocket.Upgrader{
 var clients = make(map[*websocket.Conn]bool)
 var broadcast = make(chan string)
 
-// Upgrade HTTP to WebSocket and listen for changes
+//go:embed index.htmx
+var embeddedIndex []byte
+
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -154,7 +157,9 @@ func main() {
 	defer newDB.Close()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "ui/index.htmx")
+		w.Header().Set("Content-Type", "text/html")
+    embeddedIndex = []byte(strings.ReplaceAll(string(embeddedIndex), "localhost:8080", r.Host))
+		w.Write(embeddedIndex)
 	})
 
 	// Serve WebSocket connections
