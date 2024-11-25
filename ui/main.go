@@ -158,7 +158,7 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-    embeddedIndex = []byte(strings.ReplaceAll(string(embeddedIndex), "localhost:8080", r.Host))
+		embeddedIndex = []byte(strings.ReplaceAll(string(embeddedIndex), "localhost:8080", r.Host))
 		w.Write(embeddedIndex)
 	})
 

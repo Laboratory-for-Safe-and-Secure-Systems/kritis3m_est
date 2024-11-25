@@ -607,7 +607,7 @@ func addSecureHeaders(next http.Handler) http.Handler {
 }
 
 // verifyAllowedHosts is middleware which rejects a request if the host in the
-// Host header is not in the list of allowed hosts.
+// Host header is not in the list of allowed hosts, unless "*" is included to allow all hosts.
 func verifyAllowedHosts(allowed []string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -618,7 +618,7 @@ func verifyAllowedHosts(allowed []string) func(next http.Handler) http.Handler {
 
 			goodHost := false
 			for _, host := range allowed {
-				if strings.EqualFold(host, reqHost) {
+				if host == "*" || strings.EqualFold(host, reqHost) {
 					goodHost = true
 					break
 				}
