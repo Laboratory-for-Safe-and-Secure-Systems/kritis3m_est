@@ -365,3 +365,33 @@ func (db *DB) GetSubjects() []Subject {
 
 	return subjects
 }
+
+type Node struct {
+	ID         int
+	Name       string
+	ConfigName string
+	Status     NodeState
+}
+
+func (db *DB) GetNodes() ([]Node, error) {
+	var selectedConfigurations []SelectedConfiguration
+	var nodes []Node
+
+	// Preload the necessary related data (Node and Config) to avoid N+1 queries
+	err := db.conn.Preload("Node").Preload("Config").Find(&selectedConfigurations).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch selected configurations: %w", err)
+	}
+
+	// Iterate through the selected configurations to construct the Node slice
+	for _, sc := range selectedConfigurations {
+		nodes = append(nodes, Node{
+			ID:         int(sc.Node.ID),
+			Name:       sc.Node.SerialNumber,
+			ConfigName: sc.Config.ConfigName,
+			Status:     sc.NodeState,
+		})
+	}
+
+	return nodes, nil
+}

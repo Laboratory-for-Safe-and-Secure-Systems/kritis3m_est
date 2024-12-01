@@ -19,10 +19,20 @@
         </tbody>
       </table>
     </div>
-    <!-- Bar Chart Container -->
-    <div class="max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
-      <canvas id="certificatesChart" width="400" height="200"></canvas>
+    <h1 class="text-3xl font-bold text-center mb-6">KRITIS3M Scale Nodes</h1>
+    <div id="nodes-container" class="mx-auto bg-white rounded-2xl shadow-lg overflow-x-auto mb-6">
+      <table class="min-w-full p-4 table-auto" id="nodes-table" hx-get="/nodes-data" hx-trigger="load" hx-swap="innerHTML">
+        <tbody class="divide-y divide-gray-200">
+          <tr>
+            <td colspan="3" class="text-center py-4 text-gray-500">No data available</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
+    <!-- Bar Chart Container -->
+    <!-- <div class="max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-lg overflow-hidden mb-6"> -->
+    <!--   <canvas id="certificatesChart" width="400" height="200"></canvas> -->
+    <!-- </div> -->
     <!-- Debug Info Container / scrolabale with fixed height -->
     <div id="debug-info" class="bg-gray-200 p-4 rounded-lg mb-6 max-h-48 overflow-y-auto">
       <h2 class="text-xl font-bold mb-2">Debug Information</h2>
@@ -44,6 +54,7 @@
       socket.onmessage = function(event) {
         debugLog("WebSocket message received");
         htmx.ajax("GET", "/data", {target: "#table-body"});
+        htmx.ajax("GET", "/nodes", {target: "#nodes-table"});
         fetchChartData();
       };
       socket.onclose = function(event) {
