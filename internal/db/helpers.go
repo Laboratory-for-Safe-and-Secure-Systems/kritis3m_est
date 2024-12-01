@@ -2,6 +2,7 @@ package db
 
 import (
 	"crypto/x509"
+	"encoding/asn1"
 	"errors"
 	"fmt"
 	"io"
@@ -57,6 +58,7 @@ type CertificateWithStatus struct {
 
 // Save Certificate saves a certificate to the database
 func (db *DB) saveCertificate(tx *gorm.DB, c *CertificateWithStatus) error {
+	var algo string
 	cert := c.Certificate
 	// Check if empty certificate fields are present
 	if cert.SerialNumber == nil || cert.Subject.CommonName == "" ||
@@ -84,7 +86,16 @@ func (db *DB) saveCertificate(tx *gorm.DB, c *CertificateWithStatus) error {
 			cert.RawSubjectPublicKeyInfo = []byte("Unknown")
 		}
 		if cert.SignatureAlgorithm == 0 {
-			cert.SignatureAlgorithm = x509.SHA256WithRSA
+			algo = x509.UnknownSignatureAlgorithm.String()
+		}
+	}
+
+	for _, ext := range cert.Extensions {
+		if !ext.Critical && ext.Id.Equal(asn1.ObjectIdentifier{2, 5, 29, 72}) {
+			logger.Debugf("Extension OID: %v", ext.Id)
+			algo = "ECDSA-SHA384-MLDSA65 (PQC)"
+		} else {
+			algo = cert.SignatureAlgorithm.String()
 		}
 	}
 
@@ -94,7 +105,7 @@ func (db *DB) saveCertificate(tx *gorm.DB, c *CertificateWithStatus) error {
 		Organization:  cert.Subject.Organization[0],
 		IssuedAt:      cert.NotBefore,
 		ExpiresAt:     cert.NotAfter,
-		SignatureAlgo: cert.SignatureAlgorithm.String(),
+		SignatureAlgo: algo,
 		Status:        c.Status,
 	}
 
