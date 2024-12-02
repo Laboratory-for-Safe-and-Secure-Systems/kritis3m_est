@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -15,6 +18,13 @@ import (
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/db"
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
+)
+
+type CONFIG_TYPE int
+
+const (
+	CLASSIC CONFIG_TYPE = 1
+	HYBRID  CONFIG_TYPE = 2
 )
 
 var logger = alogger.New(os.Stderr)
@@ -165,6 +175,11 @@ func generateDynamicTemplate(data interface{}, excludeFields []string) (string, 
 		rows = append(rows, fmt.Sprintf("<tr class=\"border-b\">%s</tr>", strings.Join(row, "")))
 	}
 
+	// Reverse sort the rows
+	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+		rows[i], rows[j] = rows[j], rows[i]
+	}
+
 	// Combine headers and rows into a complete table body
 	html := fmt.Sprintf("<thead class=\"bg-gray-200\"><tr>%s</tr></thead><tbody>%s</tbody>", strings.Join(headers, ""), strings.Join(rows, ""))
 	return html, nil
@@ -289,6 +304,113 @@ func main() {
 		subjects := certDB.GetSubjects()
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"certificates": ` + fmt.Sprintf("%d", len(certs)) + `, "subjects": ` + fmt.Sprintf("%d", len(subjects)) + `}`))
+	})
+
+	http.HandleFunc("/trigger", func(w http.ResponseWriter, r *http.Request) {
+		// Read the request body
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			logger.Errorf("Failed to read request body: %v", err)
+			http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+			return
+		}
+		r.Body.Close() // Close the original body to avoid leaks
+
+		// Log the body payload
+		logger.Infof("Body: %s", string(bodyBytes))
+
+		// Body Payload
+		type BPayload struct {
+			CfgID int `json:"cfg_id"`
+		}
+
+		// Unmarshal the body payload
+		var receivedBody BPayload
+		err = json.Unmarshal(bodyBytes, &receivedBody)
+		if err != nil {
+			logger.Errorf("Failed to unmarshal JSON: %v", err)
+			http.Error(w, "Failed to unmarshal JSON", http.StatusInternalServerError)
+			return
+		}
+
+		logger.Infof("Received body CFG: %d", receivedBody.CfgID)
+
+		// Payload represents the data to be sent to the backend
+		type Payload struct {
+			NodeID     int `json:"node_id"`
+			ConfigType int `json:"cfg_id"`
+		}
+
+		logger.Infof("Received body: %v", receivedBody)
+
+		var payloads []Payload
+		if receivedBody.CfgID == int(CLASSIC) {
+			payloads = []Payload{
+				{
+					NodeID:     1,
+					ConfigType: 1,
+				},
+				{
+					NodeID:     2,
+					ConfigType: 3,
+				},
+				{
+					NodeID:     3,
+					ConfigType: 5,
+				},
+			}
+		} else if receivedBody.CfgID == int(HYBRID) {
+			payloads = []Payload{
+				{
+					NodeID:     1,
+					ConfigType: 2,
+				},
+				{
+					NodeID:     2,
+					ConfigType: 4,
+				},
+				{
+					NodeID:     3,
+					ConfigType: 6,
+				},
+			}
+		}
+
+		// Encode the payloads into JSON
+		payloadBytes, err := json.Marshal(payloads)
+		if err != nil || len(payloads) == 0 {
+			logger.Errorf("Failed to marshal JSON: %v", err)
+			http.Error(w, "Failed to marshal JSON", http.StatusInternalServerError)
+			return
+		}
+
+		logger.Infof("Payload: %s", payloadBytes)
+
+		// Send POST to different backend
+		response, err := http.Post("http://10.120.0.137:8181/api/trigger", "application/json", bytes.NewReader(payloadBytes))
+		if err != nil {
+			logger.Errorf("Failed to send POST request: %v", err)
+			http.Error(w, "Failed to send POST request", http.StatusInternalServerError)
+			return
+		}
+		defer func() {
+			if closeErr := response.Body.Close(); closeErr != nil {
+				logger.Errorf("Failed to close response body: %v", closeErr)
+			}
+		}()
+
+		// Log response details
+		responseBody, _ := io.ReadAll(response.Body) // Ignore errors here for simplicity
+		logger.Infof("Response body: %s", string(responseBody))
+		logger.Infof("Status code: %d", response.StatusCode)
+		logger.Infof("Status: %s", response.Status)
+
+		// Send 200 OK JSON response
+		logger.Infof("Sending 200 OK")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+    w.Write(responseBody)
 	})
 
 	// Start broadcasting messages

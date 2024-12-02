@@ -1,143 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://unpkg.com/htmx.org"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <title>Real-Time Updates with WebSocket - Debug Version</title>
-  </head>
-  <body class="bg-gray-100 p-6">
-    <h1 class="text-3xl font-bold text-center mb-6">Enrolled Certs</h1>
-    <div id="data-container" class="mx-auto bg-white rounded-2xl shadow-lg overflow-x-auto mb-6 h-px-42">
-      <table class="min-w-full p-4 table-auto" id="table-body" hx-get="/data" hx-trigger="load" hx-swap="innerHTML">
-        <tbody class="divide-y divide-gray-200">
-          <tr>
-            <td colspan="3" class="text-center py-4 text-gray-500">No data available</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <h1 class="text-3xl font-bold text-center mb-6">KRITIS3M Scale Nodes</h1>
-    <div id="nodes-container" class="mx-auto bg-white rounded-2xl shadow-lg overflow-x-auto mb-6">
-      <table class="min-w-full p-4 table-auto" id="nodes-table" hx-get="/nodes-data" hx-trigger="load" hx-swap="innerHTML">
-        <tbody class="divide-y divide-gray-200">
-          <tr>
-            <td colspan="3" class="text-center py-4 text-gray-500">No data available</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <!-- Bar Chart Container -->
-    <!-- <div class="max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-lg overflow-hidden mb-6"> -->
-    <!--   <canvas id="certificatesChart" width="400" height="200"></canvas> -->
-    <!-- </div> -->
-    <!-- Debug Info Container / scrolabale with fixed height -->
-    <div id="debug-info" class="bg-gray-200 p-4 rounded-lg mb-6 max-h-48 overflow-y-auto">
-      <h2 class="text-xl font-bold mb-2">Debug Information</h2>
-      <pre id="debug-log" class="whitespace-pre-wrap"></pre>
-    </div>
-    <script>
-      // Debug logging function
-      function debugLog(message) {
-        console.log(message);
-        const debugElement = document.getElementById('debug-log');
-        debugElement.textContent += message + '\n';
-      }
-
-      // Establish a WebSocket connection
-      var socket = new WebSocket("ws://localhost:8080/ws");
-      socket.onopen = function(event) {
-        debugLog("WebSocket connection opened");
-      };
-      socket.onmessage = function(event) {
-        debugLog("WebSocket message received");
-        htmx.ajax("GET", "/data", {target: "#table-body"});
-        htmx.ajax("GET", "/nodes", {target: "#nodes-table"});
-        fetchChartData();
-      };
-      socket.onclose = function(event) {
-        debugLog("WebSocket closed: " + JSON.stringify(event));
-      };
-      socket.onerror = function(error) {
-        debugLog("WebSocket error: " + JSON.stringify(error));
-      };
-
-      // Chart.js initialization
-      const ctx = document.getElementById('certificatesChart').getContext('2d');
-      const certificatesChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Certificates', 'Subjects'],
-          datasets: [{
-            axis: 'y',
-            data: [0, 0],
-            backgroundColor: ['#4F46E5', '#F87171'],
-            label: 'Count'
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Count'
-              }
-            }
-          },
-          plugins: {
-            legend: {
-              display: false,
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return `${context.label}: ${context.formattedValue}`;
-                }
-              }
-            }
-          },
-        }
-      });
-
-      // Function to update the chart with data
-      function updateChart(certCount, subjectCount) {
-        debugLog(`Updating chart with: Certificates=${certCount}, Subjects=${subjectCount}`);
-        certificatesChart.data.datasets[0].data = [certCount, subjectCount];
-
-        certificatesChart.update();
-        debugLog("Chart update called");
-      }
-
-      // Function to fetch chart data and update chart
-      function fetchChartData() {
-        debugLog("Fetching chart data");
-        fetch('/chart-data')
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Network response was not ok');
-            }
-            return response.json();
-          })
-          .then(data => {
-            debugLog("Chart data received: " + JSON.stringify(data));
-            if (data && 'certificates' in data && 'subjects' in data) {
-              updateChart(data.certificates, data.subjects);
-            } else {
-              debugLog("Error: Unexpected data format");
-            }
-          })
-          .catch(error => {
-            debugLog("Error fetching chart data: " + error.message);
-          });
-      }
-
-      // Initial chart data fetch
-      debugLog("Initial chart data fetch");
-      fetchChartData();
-    </script>
-  </body>
+   <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <script src="https://unpkg.com/htmx.org"></script>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <title>Real-Time Updates with WebSocket - Debug Version</title>
+   </head>
+   <body class="bg-gray-100 p-6">
+      <h1 class="text-3xl font-bold text-center mb-6">Enrolled Certs</h1>
+      <div id="data-container" class="mx-auto bg-white rounded-2xl shadow-lg overflow-x-auto mb-6 h-px-42">
+         <table class="min-w-full p-4 table-auto" id="table-body" hx-get="/data" hx-trigger="load" hx-swap="innerHTML">
+            <tbody class="divide-y divide-gray-200">
+               <tr>
+                  <td colspan="3" class="text-center py-4 text-gray-500">No data available</td>
+               </tr>
+            </tbody>
+         </table>
+      </div>
+      <h1 class="text-3xl font-bold text-center mb-6">KRITIS3M Scale Nodes</h1>
+      <div id="nodes-container" class="mx-auto bg-white rounded-2xl shadow-lg overflow-x-auto mb-6">
+         <table class="min-w-full p-4 table-auto" id="nodes-table" hx-get="/nodes" hx-trigger="load" hx-swap="innerHTML">
+            <tbody class="divide-y divide-gray-200">
+               <tr>
+                  <td colspan="3" class="text-center py-4 text-gray-500">No data available</td>
+               </tr>
+            </tbody>
+         </table>
+      </div>
+      <!-- Select from the dropdown list of nodes and list of configurations from endpoint -->
+      <div class="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-6 mb-6">
+         <label for="config-select" class="block text-sm font-medium text-gray-700">Select Node configuration:</label>
+         <select id="config-select" name="config-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" hx-trigger="change">
+            <!-- <option disabled selected>No configurations available</option> -->
+            <option value="1">Classic SECP</option>
+            <option value="2">Hybrid PQC</option>
+         </select>
+         <button id="submit-button" class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Submit</button>
+      </div>
+      <!-- Bar Chart Container -->
+      <!-- <div class="max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-lg overflow-hidden mb-6"> -->
+      <!--   <canvas id="certificatesChart" width="400" height="200"></canvas> -->
+      <!-- </div> -->
+      <!-- Debug Info Container / scrolabale with fixed height -->
+      <div id="debug-info" class="bg-gray-200 p-4 rounded-lg mb-6 max-h-48 overflow-y-auto">
+         <h2 class="text-xl font-bold mb-2">Debug Information</h2>
+         <pre id="debug-log" class="whitespace-pre-wrap"></pre>
+      </div>
+      <script>
+         // Debug logging function
+         function debugLog(message) {
+           console.log(message);
+           const debugElement = document.getElementById('debug-log');
+           debugElement.textContent += message + '\n';
+         }
+         
+         // Establish a WebSocket connection
+         var socket = new WebSocket("ws://localhost:8080/ws");
+         socket.onopen = function(event) {
+           debugLog("WebSocket connection opened");
+         };
+         socket.onmessage = function(event) {
+           htmx.ajax("GET", "/data", {target: "#table-body"});
+           htmx.ajax("GET", "/nodes", {target: "#nodes-table"});
+         };
+         socket.onclose = function(event) {
+           debugLog("WebSocket closed: " + JSON.stringify(event));
+         };
+         socket.onerror = function(error) {
+           debugLog("WebSocket error: " + JSON.stringify(error));
+         };
+         
+         const configSelect = document.getElementById('config-select');
+         const submitButton = document.getElementById('submit-button');
+         
+         submitButton.addEventListener('click', (event) => {
+           event.preventDefault();
+         
+           const selectedConfig = configSelect.value;
+         
+           if (!selectedConfig) {
+             debugLog('Configuration not selected');
+             return;
+           }
+         
+           // change any :port to 8181
+           const origin = window.location.origin;
+           fetch(`${origin}/trigger`, {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'Accept': 'application/json',
+               'X-Requested-With': 'XMLHttpRequest',
+             },
+             body: JSON.stringify({
+               cfg_id: parseInt(selectedConfig),
+             }),
+           })
+             .then(response => {
+               if (!response.ok) throw new Error('Submission failed');
+               return response.json();
+             })
+             .then(data => {
+               debugLog('Form submitted successfully');
+               debugLog("Nodes updated with Configuration: " + selectedConfig);
+               console.log(data);
+             })
+             .catch(error => {
+               console.error(error);
+               debugLog('Form submission failed');
+             });
+         });
+      </script>
+   </body>
 </html>
