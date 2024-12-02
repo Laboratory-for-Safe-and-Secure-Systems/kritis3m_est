@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"reflect"
@@ -417,7 +418,15 @@ func main() {
 		}
 	})
 
-    w.Write(responseBody)
+	http.HandleFunc("/sendhelp", func(w http.ResponseWriter, r *http.Request) {
+		logger.Infof("Changing node status to NodeRequestedConfig")
+		rand.Seed(time.Now().UnixNano())
+		states := []db.NodeState{-1, 0, 1, 2}
+
+		nodesDB.UpdateNodeStatus(1, states[rand.Intn(len(states))])
+		nodesDB.UpdateNodeStatus(2, states[rand.Intn(len(states))])
+		nodesDB.UpdateNodeStatus(3, states[rand.Intn(len(states))])
+		w.WriteHeader(http.StatusOK)
 	})
 
 	// Start broadcasting messages

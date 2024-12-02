@@ -405,3 +405,21 @@ func (db *DB) GetNodes() ([]Node, error) {
 
 	return nodes, nil
 }
+
+// Update Status
+func (db *DB) UpdateNodeStatus(nodeID int, status NodeState) error {
+  var selectedConfiguration SelectedConfiguration
+  result := db.conn.Where("node_id = ?", nodeID).First(&selectedConfiguration)
+  if result.Error != nil {
+    logger.Errorf("Failed to find selected configuration for update: %v", result.Error)
+    return result.Error
+  }
+
+  result = db.conn.Model(&selectedConfiguration).Update("node_state", status)
+  if result.Error != nil {
+    logger.Errorf("Failed to update selected configuration: %v", result.Error)
+    return result.Error
+  }
+
+  return nil
+}
