@@ -371,6 +371,7 @@ type Node struct {
 	Name       string
 	ConfigName string
 	Status     NodeState
+	Location   string
 }
 
 func (db *DB) GetNodes() ([]Node, error) {
@@ -385,11 +386,20 @@ func (db *DB) GetNodes() ([]Node, error) {
 
 	// Iterate through the selected configurations to construct the Node slice
 	for _, sc := range selectedConfigurations {
+		if sc.Node.SerialNumber == "feldgeraet1" {
+			sc.Node.SerialNumber = "Feldgerät 1"
+		} else if sc.Node.SerialNumber == "feldgeraet2" {
+			sc.Node.SerialNumber = "Feldgerät 2"
+		} else if sc.Node.SerialNumber == "leitstelle" {
+			sc.Node.SerialNumber = "Leitstelle"
+		}
+
 		nodes = append(nodes, Node{
 			ID:         int(sc.Node.ID),
 			Name:       sc.Node.SerialNumber,
 			ConfigName: sc.Config.ConfigName,
 			Status:     sc.NodeState,
+			Location:   sc.Node.Locality,
 		})
 	}
 

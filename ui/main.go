@@ -199,7 +199,7 @@ func contains(slice []string, item string) bool {
 func handleNodeData(w http.ResponseWriter, _ *http.Request, newDB *db.DB) {
 	nodes, err := newDB.GetNodes()
 
-	tmpl, err := generateDynamicTemplate(nodes, []string{"Model"})
+	tmpl, err := generateDynamicTemplate(nodes, []string{"Model", "ID"})
 
 	t, err := template.New("tableRows").Parse(tmpl)
 	if err != nil {
