@@ -33,7 +33,7 @@ func NewDB(dbType string, dsn string) (*DB, error) {
 			return nil, err
 		}
 	case "sqlite":
-		db, err = gorm.Open(sqlite.Open(dsn+`?synchrounous=1&_journal_mode=WAL`), &gorm.Config{
+		db, err = gorm.Open(sqlite.Open(dsn+`?synchronous=1&_journal_mode=WAL`), &gorm.Config{
 			Logger: logger,
 		})
 		if err != nil {
