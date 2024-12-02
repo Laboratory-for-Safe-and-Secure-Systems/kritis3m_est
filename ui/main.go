@@ -387,7 +387,7 @@ func main() {
 		logger.Infof("Payload: %s", payloadBytes)
 
 		// Send POST to different backend
-		response, err := http.Post("http://10.120.0.137:8181/api/trigger", "application/json", bytes.NewReader(payloadBytes))
+		response, err := http.Post("http://localhost:8181/api/trigger", "application/json", bytes.NewReader(payloadBytes))
 		if err != nil {
 			logger.Errorf("Failed to send POST request: %v", err)
 			http.Error(w, "Failed to send POST request", http.StatusInternalServerError)
@@ -408,7 +408,14 @@ func main() {
 		// Send 200 OK JSON response
 		logger.Infof("Sending 200 OK")
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		if response.StatusCode != http.StatusOK {
+			w.WriteHeader(http.StatusInternalServerError)
+      w.Write(responseBody)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write(responseBody)
+		}
+	})
 
     w.Write(responseBody)
 	})
