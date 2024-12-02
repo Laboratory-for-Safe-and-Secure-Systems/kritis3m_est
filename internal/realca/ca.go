@@ -39,7 +39,7 @@ const (
 	alphanumerics              = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 	bitSizeHeader              = "Bit-Size"
 	csrAttrsAPS                = "csrattrs"
-	defaultCertificateDuration = time.Hour * 24 * 90
+	defaultCertificateDuration = time.Hour * 24 * 4
 	serverKeyGenPassword       = "pseudohistorical"
 	rootCertificateDuration    = time.Hour * 24
 	triggerErrorsAPS           = "triggererrors"
