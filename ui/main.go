@@ -388,7 +388,7 @@ func main() {
 		logger.Infof("Payload: %s", payloadBytes)
 
 		// Send POST to different backend
-		response, err := http.Post("http://localhost:8181/api/trigger", "application/json", bytes.NewReader(payloadBytes))
+		response, err := http.Post("http://kritis3m_scale:8181/api/trigger", "application/json", bytes.NewReader(payloadBytes))
 		if err != nil {
 			logger.Errorf("Failed to send POST request: %v", err)
 			http.Error(w, "Failed to send POST request", http.StatusInternalServerError)
