@@ -314,12 +314,6 @@ func enroll(w http.ResponseWriter, r *http.Request) {
 		// requests but does not verify.
 		cert := r.TLS.PeerCertificates[0]
 
-		// Compare public key fields.
-		if !bytes.Equal(csr.RawSubjectPublicKeyInfo, cert.RawSubjectPublicKeyInfo) {
-			http.Error(w, "Public key in CSR does not match public key in client certificate", http.StatusBadRequest)
-			return
-		}
-
 		// Compare Subject fields.
 		if !bytes.Equal(csr.RawSubject, cert.RawSubject) {
 			errSubjectChanged.Write(w)
