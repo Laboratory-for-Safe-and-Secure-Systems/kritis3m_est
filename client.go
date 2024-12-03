@@ -102,7 +102,7 @@ type Client struct {
 
 // Client constants.
 const (
-	estVersion = "v1.0.6"
+	estVersion = "v1.0.5"
 	userAgent  = "KRITS3M EST Client " + estVersion + " github.com/Laboratory-for-Safe-and-Secure-Systems/est"
 )
 
@@ -550,6 +550,11 @@ func (c *Client) makeHTTPClient() *http.Client {
 		NoEncryption:         false,
 		ASLKeyExchangeMethod: 0,
 		HybridSignatureMode:  0,
+		PKCS11: asl.PKCS11ASL{
+			LongTermCryptoModule: asl.LongTermCryptoModule{
+				Path: c.LibPath,
+			},
+		},
 		DeviceCertificateChain: asl.DeviceCertificateChain{
 			Path: c.CertificatePath,
 		},

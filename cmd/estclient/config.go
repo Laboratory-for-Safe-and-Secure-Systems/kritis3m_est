@@ -41,6 +41,7 @@ type config struct {
 	Implicit          string            `json:"implicit_anchor"`
 	PrivateKey        *privateKey       `json:"private_key,omitempty"`
 	Certificate       string            `json:"client_certificates"`
+  LibPath           string            `json:"lib_path,omitempty"`
 	certificates      []*x509.Certificate
 	ekcerts           []*x509.Certificate
 	baseDir           string
@@ -120,6 +121,7 @@ func (cfg *config) MakeClient() (*est.Client, error) {
 		ImplicitAnchor:        cfg.Implicit,
 		HostHeader:            cfg.HostHeader,
 		PrivateKeyPath:        cfg.PrivateKey.Path,
+    LibPath:               cfg.LibPath,
 		CertificatePath:       cfg.Certificate,
 		Username:              cfg.Username,
 		Password:              cfg.Password,
@@ -549,6 +551,10 @@ func newConfig(set *flag.FlagSet) (config, error) {
 
 		cfg.ekcerts = ekcerts
 	}
+
+  if libPath, ok := cfg.flags[pkcs11libFlag]; ok {
+    cfg.LibPath = fullPath(wd, libPath)
+  }
 
 	// Process private key. Note that a private key located in a file is the
 	// only type which can be specified at the command line.

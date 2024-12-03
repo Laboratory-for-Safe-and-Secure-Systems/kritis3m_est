@@ -74,6 +74,7 @@ const (
 	insecureFlag           = "insecure"
 	ipsFlag                = "ips"
 	keyFlag                = "key"
+	pkcs11libFlag          = "pkcs11-lib"
 	keyOutFlag             = "keyout"
 	localityFlag           = "locality"
 	organizationFlag       = "org"
@@ -189,6 +190,11 @@ var optDefs = map[string]option{
 	insecureFlag: {
 		desc:         "omit server TLS certificate verification",
 		defaultValue: false,
+	},
+  pkcs11libFlag: {
+		argFmt:       pathFmt,
+		desc:         "path to PKCS#11 library",
+		defaultValue: "",
 	},
 	keyFlag: {
 		argFmt:       pathFmt,
