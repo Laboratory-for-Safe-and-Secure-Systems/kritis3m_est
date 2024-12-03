@@ -115,9 +115,12 @@ func InitPKI(config *KRITIS3MPKIConfiguration) *KRITIS3MPKI {
 // LoadPrivateKey loads a private key from a PEM-encoded buffer
 func (s *KRITIS3MPKI) LoadPrivateKey(keyData []byte) error {
 	s.PrivateKey = C.privateKey_new()
-	ret := C.privateKey_loadKeyFromBuffer(s.PrivateKey, (*C.uint8_t)(&keyData[0]), C.size_t(len(keyData)))
-	if ret != C.KRITIS3M_PKI_SUCCESS {
-		return fmt.Errorf("PKI: failed to load private key: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
+	// Check if keyDATA starts with pkcs11:
+	if len(keyData) > 7 && string(keyData[:7]) != "pkcs11:" {
+		ret := C.privateKey_loadKeyFromBuffer(s.PrivateKey, (*C.uint8_t)(&keyData[0]), C.size_t(len(keyData)))
+		if ret != C.KRITIS3M_PKI_SUCCESS {
+			return fmt.Errorf("PKI: failed to load private key: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
+		}
 	}
 	return nil
 }
