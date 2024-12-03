@@ -267,7 +267,7 @@ func enroll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	aps := chi.URLParam(r, apsParamName)
 
-	csr, err := readCSRRequest(r.Body, true)
+	csr, err := readCSRRequest(r.Body, false)
 	if writeOnError(ctx, w, logMsgReadBodyFailed, err) {
 		return
 	}
