@@ -71,6 +71,7 @@ type Client struct {
 	// support private keys resident on a hardware security module (HSM),
 	// Trusted Platform Module (TPM) or other hardware device.
 	PrivateKeyPath string
+	LibPath        string
 
 	// AdditionalHeaders are additional HTTP headers to include with the
 	// request to the EST server.
