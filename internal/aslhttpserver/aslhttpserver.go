@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
@@ -58,6 +59,7 @@ func NewASLServer(addr string, handler http.Handler, endpointConfig *asl.Endpoin
 // ASLConn wraps the TCPConn and ASLSession
 type ASLConn struct {
 	tcpConn    *net.TCPConn
+	file       *os.File
 	aslSession *asl.ASLSession
 	peerCert   *x509.Certificate // Store the peer's certificate
 	TLSState   *tls.ConnectionState
@@ -78,6 +80,7 @@ func (c ASLConn) Write(b []byte) (n int, err error) {
 func (c ASLConn) Close() error {
 	asl.ASLCloseSession(c.aslSession)
 	asl.ASLFreeSession(c.aslSession)
+  c.file.Close()
 	return c.tcpConn.Close()
 }
 
@@ -145,6 +148,7 @@ func (l ASLListener) Accept() (net.Conn, error) {
 
 	aslConn := &ASLConn{
 		tcpConn:    tcpConn,
+    file:       file,
 		aslSession: session,
 	}
 
@@ -188,7 +192,7 @@ func (srv *ASLServer) ListenAndServeASLTLS() error {
 		endpoint:    srv.ASLTLSEndpoint,
 	}
 
-  log.Printf("\033[1;32mStarting ASL server on %s\033[0m", address)
+	log.Printf("\033[1;32mStarting ASL server on %s\033[0m", address)
 
 	// Serve the HTTP requests using the custom ASL listener
 	return srv.Serve(aslListener)

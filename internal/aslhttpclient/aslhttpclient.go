@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
@@ -14,6 +15,7 @@ import (
 // ASLConn wraps the TCPConn and ASLSession (same as in the server)
 type ASLConn struct {
 	tcpConn    *net.TCPConn
+  file       *os.File
 	aslSession *asl.ASLSession
 }
 
@@ -32,6 +34,7 @@ func (c *ASLConn) Write(b []byte) (n int, err error) {
 func (c *ASLConn) Close() error {
 	asl.ASLCloseSession(c.aslSession)
 	asl.ASLFreeSession(c.aslSession)
+  c.file.Close()
 	return c.tcpConn.Close()
 }
 
@@ -86,6 +89,7 @@ func (t *ASLTransport) DialContext(ctx context.Context, network, addr string) (n
 
 	aslConn := &ASLConn{
 		tcpConn:    rawConn,
+    file:       file,
 		aslSession: aslSession,
 	}
 
