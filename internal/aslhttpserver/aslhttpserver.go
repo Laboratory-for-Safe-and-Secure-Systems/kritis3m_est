@@ -80,7 +80,7 @@ func (c ASLConn) Write(b []byte) (n int, err error) {
 func (c ASLConn) Close() error {
 	asl.ASLCloseSession(c.aslSession)
 	asl.ASLFreeSession(c.aslSession)
-  c.file.Close()
+	c.file.Close()
 	return c.tcpConn.Close()
 }
 
@@ -148,7 +148,7 @@ func (l ASLListener) Accept() (net.Conn, error) {
 
 	aslConn := &ASLConn{
 		tcpConn:    tcpConn,
-    file:       file,
+		file:       file,
 		aslSession: session,
 	}
 
