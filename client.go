@@ -552,9 +552,7 @@ func (c *Client) makeHTTPClient() *http.Client {
 		ASLKeyExchangeMethod: 0,
 		HybridSignatureMode:  0,
 		PKCS11: asl.PKCS11ASL{
-			LongTermCryptoModule: asl.LongTermCryptoModule{
-				Path: c.LibPath,
-			},
+		  Path: c.LibPath,
 		},
 		DeviceCertificateChain: asl.DeviceCertificateChain{
 			Path: c.CertificatePath,
