@@ -107,12 +107,7 @@ func Load(certFile, keyFile string) (*RealCA, error) {
 		return nil, fmt.Errorf("failed to read certificate file: %w", err)
 	}
 
-	keyData, err := os.ReadFile(keyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read key file: %w", err)
-	}
-
-	err = kritis3mPKI.LoadPrivateKey(keyData)
+	keyData, err := kritis3mPKI.LoadPrivateKey(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}

@@ -19,10 +19,18 @@ type config struct {
 	Logfile             string          `json:"log_file"`
 }
 
+// PKCS11Config contains the PKCS#11 configuration
+type pkcs11Config struct {
+	Path string `json:"path"`
+	Slot uint   `json:"slot"`
+	Pin  string `json:"pin"`
+}
+
 // RealCAConfig contains the real CA configuration.
 type realCAConfig struct {
-	Certs string `json:"certificates"`
-	Key   string `json:"private_key"`
+	Certs  string        `json:"certificates"`
+	Key    string        `json:"private_key"`
+	PKCS11 *pkcs11Config `json:"pkcs11,omitempty"`
 }
 
 // tlsConfig contains the server's TLS configuration.
@@ -68,7 +76,12 @@ func configFromFile(filename string) (*config, error) {
 const sample = `{
     "ca": {
         "certificates": "/path/to/CA/certificates.pem",
-        "private_key": "/path/to/CA/private/key.pem"
+        "private_key": "/path/to/CA/private/key.pem",
+        "pkcs11": {
+            "path": "/usr/lib/softhsm/libsofthsm2.so",
+            "slot": 0,
+            "pin": "1234"
+        }
     },
     "tls": {
         "listen_address": "localhost:8443",
@@ -89,9 +102,9 @@ const sample = `{
         "keylog_file": "/path/to/keylog/file.txt"
     },
     "asl_config": {
-      logging_enabled: true,
-      log_level: 3,
-      secure_element_support: false
+        "logging_enabled": true,
+        "log_level": 3,
+        "secure_element_support": false
     },
     "allowed_hosts": [
         "localhost",

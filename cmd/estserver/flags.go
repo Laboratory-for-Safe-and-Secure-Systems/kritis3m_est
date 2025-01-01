@@ -1,29 +1,23 @@
-/*
-Copyright (c) 2020 GMO GlobalSign, Inc.
-
-Licensed under the MIT License (the "License"); you may not use this file except
-in compliance with the License. You may obtain a copy of the License at
-
-https://opensource.org/licenses/MIT
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
 	"flag"
 	"fmt"
+	"os/exec"
+	"strings"
 )
 
 // Global constants.
 const (
-	appName       = "estserver"
-	versionString = "1.0.6"
+	appName = "estserver"
+)
+
+// Version information
+var (
+	versionString string
+	commit        = "unknown"
+	dirty         = false
+	tag           = "unknown"
 )
 
 // Flag name constants.
@@ -42,16 +36,43 @@ var (
 	fVersion      = flag.Bool(versionFlag, false, "")
 )
 
+func init() {
+	initVersionInfo()
+}
+
+// initVersionInfo initializes version information from Git
+func initVersionInfo() {
+	// Get latest tag
+	if tagOutput, err := exec.Command("git", "describe", "--tags", "--abbrev=0").Output(); err == nil {
+		tag = strings.TrimSpace(string(tagOutput))
+	}
+
+	// Get commit hash
+	if hash, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		commit = strings.TrimSpace(string(hash))
+	}
+
+	// Check if working directory is dirty
+	if status, err := exec.Command("git", "status", "--porcelain").Output(); err == nil {
+		dirty = len(status) > 0
+	}
+
+	// Construct version string
+	versionString = fmt.Sprintf("%s (commit: %s%s)",
+		tag,
+		commit,
+		map[bool]string{true: "-dirty", false: ""}[dirty],
+	)
+}
+
 // usage outputs usage information.
 func usage() {
 	fmt.Printf("usage: %s [options]\n", appName)
 	fmt.Println()
-
 	fmt.Printf("%s is a non-production Enrollment over Secure Transport (EST)\n", appName)
 	fmt.Printf("certificate enrollment protocol server for testing and demonstration\n")
 	fmt.Printf("purposes. See RFC7030.\n")
 	fmt.Println()
-
 	const fw = 16
 	fmt.Println("Options:")
 	fmt.Printf("    -%-*s path to configuration file\n", fw, configFlag+" <path>")
