@@ -247,18 +247,10 @@ func (cfg *config) CSRTemplate() (*x509.CertificateRequest, error) {
 func (k *privateKey) Get(baseDir string) (interface{}, func() error, error) {
 	switch {
 	case k.Path != "":
-		var key interface{}
-		keyData, err := os.ReadFile(fullPath(baseDir, k.Path))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read key file: %w", err)
-		}
-
-		err = kritis3mPKI.LoadPrivateKey(keyData)
+		key, err := kritis3mPKI.LoadPrivateKey(fullPath(baseDir, k.Path))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load private key: %w", err)
 		}
-
-		key = keyData
 
 		return key, func() error { return nil }, nil
 
