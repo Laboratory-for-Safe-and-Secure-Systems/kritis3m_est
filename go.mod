@@ -1,4 +1,4 @@
-module github.com/Laboratory-for-Safe-and-Secure-Systems/est
+module github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est
 
 go 1.23
 

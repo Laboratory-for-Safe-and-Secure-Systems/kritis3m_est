@@ -19,12 +19,12 @@ To install the EST server/client you have 3 options.
 The first option does not require installing the Go toolchain, but it requires
 the KRITIS3M ASL Library to be installed.
 
-- Download the latest release from the [releases page](https://github.com/Laboratory-for-Safe-and-Secure-Systems/est/releases).
+- Download the latest release from the [releases page](https://github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/releases).
 
 - Clone the repository and build the server from source:
 
 ```bash
-git clone https://github.com/Laboratory-for-Safe-and-Secure-Systems/est.git
+git clone https://github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est.git
 cd est
 go build -o estserver cmd/estserver
 ```
@@ -32,7 +32,7 @@ go build -o estserver cmd/estserver
 - Use the `go install` command:
 
 ```bash
-go install github.com/Laboratory-for-Safe-and-Secure-Systems/est/cmd/estserver@latest
+go install github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/cmd/estserver@latest
 ```
 
 ## Usage

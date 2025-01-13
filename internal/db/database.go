@@ -6,7 +6,7 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

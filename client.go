@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/aslhttpclient"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpclient"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 )
 
@@ -104,7 +104,7 @@ type Client struct {
 // Client constants.
 const (
 	estVersion = "v1.0.5"
-	userAgent  = "KRITS3M EST Client " + estVersion + " github.com/Laboratory-for-Safe-and-Secure-Systems/est"
+	userAgent  = "KRITS3M EST Client " + estVersion + " github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est"
 )
 
 // CACerts requests a copy of the current CA certificates.

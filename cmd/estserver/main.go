@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/est"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/alogger"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/aslhttpserver"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/est/internal/realca"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 )
 
