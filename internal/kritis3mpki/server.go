@@ -53,7 +53,7 @@ func (s *KRITIS3MPKI) CreateCertificate(csrData []byte, validity int, isCA bool)
 	if isCA {
 		ret = C.outputCert_configureAsCA(s.OutputCert)
 	} else {
-		ret = C.outputCert_configureAsEntity(s.OutputCert)
+		ret = C.outputCert_configureAsMachineEntity(s.OutputCert)
 	}
 	if ret != C.KRITIS3M_PKI_SUCCESS {
 		return fmt.Errorf("failed to configure cert: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
