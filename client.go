@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpclient"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpclient"
 )
 
 // Client is an EST client implementing the Enrollment over Secure Transport
@@ -550,9 +550,8 @@ func (c *Client) makeHTTPClient() *http.Client {
 		MutualAuthentication: true,
 		NoEncryption:         false,
 		ASLKeyExchangeMethod: 0,
-		HybridSignatureMode:  0,
 		PKCS11: asl.PKCS11ASL{
-		  Path: c.LibPath,
+			Path: c.LibPath,
 		},
 		DeviceCertificateChain: asl.DeviceCertificateChain{
 			Path: c.CertificatePath,

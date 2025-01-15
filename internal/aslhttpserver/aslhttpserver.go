@@ -107,8 +107,7 @@ func (c ASLConn) SetWriteDeadline(t time.Time) error {
 // Simulate a TLS connection state
 func (c *ASLConn) simulateTLSState() {
 	// Capture and store the peer certificate (if available)
-	wolfssl := asl.GetWolfSSLSession(c.aslSession)
-	peerCert, err := asl.WolfSSL_get_peer_certificate(wolfssl)
+	peerCert, err := asl.ASLGetPeerCertificate(c.aslSession)
 	if err == nil {
 		c.peerCert = peerCert
 	} else {

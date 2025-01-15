@@ -236,7 +236,6 @@ type DBAslEndpointConfig struct {
 	NoEncryption         bool                     `json:"no_encrypt"`
 	ASLKeyExchangeMethod asl.ASLKeyExchangeMethod `json:"kex"`
 	UseSecureElement     bool                     `json:"use_secure_elem"`
-	HybridSignatureMode  asl.HybridSignatureMode  `json:"signature_mode"`
 	Keylog               bool                     `json:"keylog"`
 
 	IdentityID uint        `json:"identity_id"`

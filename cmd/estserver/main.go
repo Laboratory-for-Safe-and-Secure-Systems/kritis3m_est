@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
+	est "github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 )
 
 const (
@@ -75,7 +75,6 @@ func main() {
 		MutualAuthentication:   cfg.Endpoint.MutualAuthentication,
 		NoEncryption:           cfg.Endpoint.NoEncryption,
 		ASLKeyExchangeMethod:   asl.ASLKeyExchangeMethod(cfg.Endpoint.ASLKeyExchangeMethod),
-		HybridSignatureMode:    asl.HybridSignatureMode(cfg.Endpoint.HybridSignatureMode),
 		DeviceCertificateChain: asl.DeviceCertificateChain{Path: cfg.TLS.Certs},
 		PrivateKey: asl.PrivateKey{
 			Path: cfg.TLS.Key,

@@ -46,7 +46,6 @@ type endpointConfig struct {
 	MutualAuthentication bool   `json:"mutual_authentication"`
 	NoEncryption         bool   `json:"no_encryption"`
 	ASLKeyExchangeMethod int    `json:"asl_key_exchange_method"`
-	HybridSignatureMode  int    `json:"hybrid_signature_mode"`
 	KeylogFile           string `json:"keylog_file"`
 }
 
