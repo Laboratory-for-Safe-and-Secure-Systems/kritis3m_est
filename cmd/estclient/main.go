@@ -21,18 +21,30 @@ import (
 	"os"
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3mpki"
 )
 
 func main() {
-	// Set ASL
-	aslConfig := &asl.ASLConfig{
-		LoggingEnabled: true,
-		LogLevel:       3,
-	}
-	asl.ASLinit(aslConfig)
-
 	log.SetPrefix(fmt.Sprintf("%s: ", appName))
 	log.SetFlags(0)
+
+	// Set ASL
+	aslConfig := &asl.ASLConfig{
+		LogLevel:       4,
+		LoggingEnabled: true,
+	}
+	err := asl.ASLinit(aslConfig)
+	if err != nil {
+		log.Fatalf("failed to initialize ASL: %v", err)
+	}
+
+	err = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
+		LogLevel:       4,
+		LoggingEnabled: true,
+	})
+	if err != nil {
+		log.Fatalf("failed to initialize PKI: %v", err)
+	}
 
 	// Detect command.
 	if len(os.Args) < 2 {

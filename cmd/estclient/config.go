@@ -24,11 +24,6 @@ import (
 	"github.com/globalsign/pemfile"
 )
 
-var kritis3mPKI = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
-	LogLevel:       kritis3mpki.KRITIS3M_PKI_LOG_LEVEL_INF,
-	LoggingEnabled: true,
-})
-
 // config contains configuration options.
 type config struct {
 	Server            string            `json:"server"`
@@ -154,14 +149,14 @@ func (cfg *config) GenerateCSR(key interface{}, tmpl *x509.CertificateRequest) (
 		}
 	}
 
-	err = kritis3mPKI.CreateCSR(kritis3mpki.SigningRequestMetadata{
+	err = kritis3mpki.Kritis3mPKI.CreateCSR(kritis3mpki.SigningRequestMetadata{
 		CSR: tmpl,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate request: %v", err)
 	}
 
-	csr, err := kritis3mPKI.FinalizeCSR()
+	csr, err := kritis3mpki.Kritis3mPKI.FinalizeCSR()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize certificate request: %v", err)
 	}
@@ -247,7 +242,7 @@ func (cfg *config) CSRTemplate() (*x509.CertificateRequest, error) {
 func (k *privateKey) Get(baseDir string) (interface{}, func() error, error) {
 	switch {
 	case k.Path != "":
-		key, err := kritis3mPKI.LoadPrivateKey(fullPath(baseDir, k.Path))
+		key, err := kritis3mpki.Kritis3mPKI.LoadPrivateKey(fullPath(baseDir, k.Path))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load private key: %w", err)
 		}

@@ -201,7 +201,7 @@ func init() {
 			longDesc:  reenrollDesc,
 			cmdFunc:   reenroll,
 			flags: []string{
-        pkcs11libFlag,
+				pkcs11libFlag,
 				apsFlag,
 				certsFlag,
 				configFlag,

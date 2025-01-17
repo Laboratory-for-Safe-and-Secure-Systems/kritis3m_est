@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -15,7 +16,7 @@ import (
 // ASLConn wraps the TCPConn and ASLSession (same as in the server)
 type ASLConn struct {
 	tcpConn    *net.TCPConn
-  file       *os.File
+	file       *os.File
 	aslSession *asl.ASLSession
 }
 
@@ -34,7 +35,7 @@ func (c *ASLConn) Write(b []byte) (n int, err error) {
 func (c *ASLConn) Close() error {
 	asl.ASLCloseSession(c.aslSession)
 	asl.ASLFreeSession(c.aslSession)
-  c.file.Close()
+	c.file.Close()
 	return c.tcpConn.Close()
 }
 
@@ -89,7 +90,7 @@ func (t *ASLTransport) DialContext(ctx context.Context, network, addr string) (n
 
 	aslConn := &ASLConn{
 		tcpConn:    rawConn,
-    file:       file,
+		file:       file,
 		aslSession: aslSession,
 	}
 
@@ -130,25 +131,32 @@ func (t *ASLTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to establish ASL connection: %v", err)
 		}
-		defer conn.Close()
 
 		// Set a timeout for writing the request
 		writeDeadline := time.Now().Add(5 * time.Second)
 		err = conn.SetWriteDeadline(writeDeadline)
 		if err != nil {
+			conn.Close()
 			return nil, fmt.Errorf("failed to set write deadline: %v", err)
 		}
 
 		// Send the HTTP request manually over the custom connection
 		err = req.Write(conn)
 		if err != nil {
+			conn.Close()
 			return nil, fmt.Errorf("failed to write request: %v", err)
 		}
 
 		// Read the HTTP response
 		resp, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
+			conn.Close()
 			return nil, fmt.Errorf("failed to read response: %v", err)
+		}
+
+		resp.Body = &customReadCloser{
+			ReadCloser: resp.Body,
+			conn:       conn,
 		}
 
 		return resp, nil
@@ -156,4 +164,18 @@ func (t *ASLTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// Fallback for non-https schemes
 	return http.DefaultTransport.RoundTrip(req)
+}
+
+type customReadCloser struct {
+	io.ReadCloser
+	conn net.Conn
+}
+
+func (c *customReadCloser) Close() error {
+	err := c.ReadCloser.Close()
+	connErr := c.conn.Close()
+	if err != nil {
+		return err
+	}
+	return connErr
 }

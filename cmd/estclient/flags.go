@@ -191,7 +191,7 @@ var optDefs = map[string]option{
 		desc:         "omit server TLS certificate verification",
 		defaultValue: false,
 	},
-  pkcs11libFlag: {
+	pkcs11libFlag: {
 		argFmt:       pathFmt,
 		desc:         "path to PKCS#11 library",
 		defaultValue: "",

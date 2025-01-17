@@ -53,19 +53,13 @@ const (
 	pkcs1PublicKeyPEMType  = "RSA PUBLIC KEY"
 )
 
-// ASL PKI
-var kritis3mPKI = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
-	LogLevel:       kritis3mpki.KRITIS3M_PKI_LOG_LEVEL_DBG,
-	LoggingEnabled: true,
-})
-
 // RealCA is a simple CA implementation that uses a single key pair and
 // certificate to sign requests.
 // It uses Root 1 Intermediate 2 Entity hierarchy.
 type RealCA struct {
 	certs       []*x509.Certificate
 	key         interface{}
-	kritis3mPKI *kritis3mpki.KRITIS3MPKI
+	kritis3mpki *kritis3mpki.KRITIS3MPKI
 	database    *db.DB
 }
 
@@ -95,7 +89,7 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 	return &RealCA{
 		certs:       cacerts,
 		key:         key,
-		kritis3mPKI: kritis3mPKI,
+		kritis3mpki: kritis3mpki.Kritis3mPKI,
 		database:    database,
 	}, nil
 }
@@ -107,12 +101,12 @@ func Load(certFile, keyFile string) (*RealCA, error) {
 		return nil, fmt.Errorf("failed to read certificate file: %w", err)
 	}
 
-	keyData, err := kritis3mPKI.LoadPrivateKey(keyFile)
+	keyData, err := kritis3mpki.Kritis3mPKI.LoadPrivateKey(keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}
 
-	err = kritis3mPKI.LoadIssuerCert(certData)
+	err = kritis3mpki.Kritis3mPKI.LoadIssuerCert(certData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load issuer cert: %w", err)
 	}
@@ -247,13 +241,13 @@ func (ca *RealCA) Enroll(
 	}
 
 	// Create certificate using aslPKI
-	err := kritis3mPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration), false)
+	err := kritis3mpki.Kritis3mPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
 
 	// Finalize the certificate
-	pemCertData, err := kritis3mPKI.FinalizeCertificate()
+	pemCertData, err := kritis3mpki.Kritis3mPKI.FinalizeCertificate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize certificate: %w", err)
 	}

@@ -117,18 +117,23 @@ const (
 	ALGORITHMMLDSA87 Algorithm = "mldsa87"
 )
 
+var Kritis3mPKI *KRITIS3MPKI
+
+// Create instance of PKI globally
 // NewKRITIS3MPKI creates a new KRITIS3MPKI instance
-func InitPKI(config *KRITIS3MPKIConfiguration) *KRITIS3MPKI {
+func InitPKI(config *KRITIS3MPKIConfiguration) error {
 	ret := C.kritis3m_pki_init(config.toC())
 	if ret != C.KRITIS3M_PKI_SUCCESS {
 		fmt.Println("Failed to initialize PKI")
 		return nil
 	}
 
-	return &KRITIS3MPKI{
+	Kritis3mPKI = &KRITIS3MPKI{
 		Configuration: config,
 		Error:         &KRITIS3MPKIError{},
 	}
+
+	return nil
 }
 
 // LoadPrivateKey loads a private key from a PEM-encoded buffer or PKCS#11 token
