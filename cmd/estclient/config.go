@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3mpki"
 	"github.com/ThalesIgnite/crypto11"
@@ -347,6 +348,7 @@ func (k *privateKey) UnmarshalJSON(b []byte) error {
 
 // newConfig returns a configuration object from a file.
 func newConfig(set *flag.FlagSet) (config, error) {
+	loglevel := int32(2)
 	var cfg = config{
 		flagSet:   set,
 		flags:     make(map[string]string),
@@ -434,6 +436,14 @@ func newConfig(set *flag.FlagSet) (config, error) {
 	}
 
 	// Override configuration file values from command line, if specified
+	if _, ok := cfg.flags[verboseFlag]; ok {
+		loglevel = 3
+	}
+
+	if _, ok := cfg.flags[debugFlag]; ok {
+		loglevel = 4
+	}
+
 	if aps, ok := cfg.flags[apsFlag]; ok {
 		cfg.APS = aps
 	}
@@ -466,6 +476,24 @@ func newConfig(set *flag.FlagSet) (config, error) {
 
 			cfg.AdditionalHeaders[strings.TrimSpace(name)] = strings.TrimSpace(val)
 		}
+	}
+
+	aslConfig := &asl.ASLConfig{
+		LogLevel:       loglevel,
+		LoggingEnabled: true,
+	}
+	err = asl.ASLinit(aslConfig)
+	if err != nil {
+		return config{}, fmt.Errorf("failed to initialize ASL: %w", err)
+	}
+
+	// Initialize PKI
+	err = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
+		LogLevel:       loglevel,
+		LoggingEnabled: true,
+	})
+	if err != nil {
+		return config{}, fmt.Errorf("failed to initialize PKI: %w", err)
 	}
 
 	// Process explicit and implicit anchor databases.

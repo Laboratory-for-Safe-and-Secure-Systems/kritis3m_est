@@ -178,6 +178,8 @@ func init() {
 				serverFlag,
 				usernameFlag,
 				timeoutFlag,
+				verboseFlag,
+				debugFlag,
 			},
 			extraFlags: [][]string{
 				csrFlags,
@@ -219,6 +221,8 @@ func init() {
 				serverFlag,
 				usernameFlag,
 				timeoutFlag,
+				verboseFlag,
+				debugFlag,
 			},
 			usageExtras: []func(io.Writer, int){
 				usageCopyCSR,

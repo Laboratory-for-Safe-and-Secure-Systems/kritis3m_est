@@ -75,6 +75,8 @@ const (
 	ipsFlag                = "ips"
 	keyFlag                = "key"
 	pkcs11libFlag          = "pkcs11-lib"
+	verboseFlag            = "v"
+	debugFlag              = "d"
 	keyOutFlag             = "keyout"
 	localityFlag           = "locality"
 	organizationFlag       = "org"
@@ -195,6 +197,14 @@ var optDefs = map[string]option{
 		argFmt:       pathFmt,
 		desc:         "path to PKCS#11 library",
 		defaultValue: "",
+	},
+	verboseFlag: {
+		desc:         "enable verbose output",
+		defaultValue: false,
+	},
+	debugFlag: {
+		desc:         "enable debug output",
+		defaultValue: false,
 	},
 	keyFlag: {
 		argFmt:       pathFmt,
@@ -472,6 +482,8 @@ func usageCSRFlags(w io.Writer, line int) {
 		emailsFlag,
 		ipsFlag,
 		urisFlag,
+		verboseFlag,
+		debugFlag,
 	})
 	fmt.Fprintln(w)
 
