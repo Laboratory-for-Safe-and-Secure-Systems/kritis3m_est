@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/utils"
 )

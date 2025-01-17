@@ -13,9 +13,10 @@ import (
 	"time"
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
-	est "github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3mpki"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
 )
 
@@ -68,7 +69,7 @@ func main() {
 
 	err = asl.ASLinit(libConfig)
 	if err != nil {
-		log.Fatalf("Error initializing wolfSSL: %v", err)
+		log.Fatalf("Error initializing ASL: %v", err)
 	}
 
 	endpointConfig := &asl.EndpointConfig{
@@ -89,6 +90,14 @@ func main() {
 	// check if the endpoint is not null pointer
 	if endpoint == nil {
 		log.Fatalf("failed to setup server endpoint")
+	}
+
+	err = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
+		LogLevel:       int32(cfg.ASLConfig.LogLevel),
+		LoggingEnabled: true,
+	})
+	if err != nil {
+		log.Fatalf("failed to initialize PKI: %v", err)
 	}
 
 	// Create CA.

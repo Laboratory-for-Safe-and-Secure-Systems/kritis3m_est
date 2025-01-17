@@ -20,9 +20,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/db"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3mpki"
 	"go.mozilla.org/pkcs7"
 )

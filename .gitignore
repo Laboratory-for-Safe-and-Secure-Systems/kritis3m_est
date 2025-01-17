@@ -11,3 +11,6 @@ cmd/estserver/estserver
 cmd/estclient/estclient
 estserver
 estclient
+
+# VS Code
+.vscode

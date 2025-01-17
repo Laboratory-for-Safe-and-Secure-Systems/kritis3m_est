@@ -20,11 +20,11 @@ type ASLConn struct {
 	aslSession *asl.ASLSession
 }
 
-func (c *ASLConn) Read(b []byte) (n int, err error) {
+func (c ASLConn) Read(b []byte) (n int, err error) {
 	return asl.ASLReceive(c.aslSession, b)
 }
 
-func (c *ASLConn) Write(b []byte) (n int, err error) {
+func (c ASLConn) Write(b []byte) (n int, err error) {
 	err = asl.ASLSend(c.aslSession, b)
 	if err != nil {
 		return 0, err
@@ -32,30 +32,30 @@ func (c *ASLConn) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-func (c *ASLConn) Close() error {
+func (c ASLConn) Close() error {
 	asl.ASLCloseSession(c.aslSession)
 	asl.ASLFreeSession(c.aslSession)
 	c.file.Close()
 	return c.tcpConn.Close()
 }
 
-func (c *ASLConn) LocalAddr() net.Addr {
+func (c ASLConn) LocalAddr() net.Addr {
 	return c.tcpConn.LocalAddr()
 }
 
-func (c *ASLConn) RemoteAddr() net.Addr {
+func (c ASLConn) RemoteAddr() net.Addr {
 	return c.tcpConn.RemoteAddr()
 }
 
-func (c *ASLConn) SetDeadline(t time.Time) error {
+func (c ASLConn) SetDeadline(t time.Time) error {
 	return c.tcpConn.SetDeadline(t)
 }
 
-func (c *ASLConn) SetReadDeadline(t time.Time) error {
+func (c ASLConn) SetReadDeadline(t time.Time) error {
 	return c.tcpConn.SetReadDeadline(t)
 }
 
-func (c *ASLConn) SetWriteDeadline(t time.Time) error {
+func (c ASLConn) SetWriteDeadline(t time.Time) error {
 	return c.tcpConn.SetWriteDeadline(t)
 }
 
@@ -154,6 +154,7 @@ func (t *ASLTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			return nil, fmt.Errorf("failed to read response: %v", err)
 		}
 
+		// Set the response body to close the connection
 		resp.Body = &customReadCloser{
 			ReadCloser: resp.Body,
 			conn:       conn,
