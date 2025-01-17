@@ -16,6 +16,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -28,9 +29,24 @@ func main() {
 	log.SetPrefix(fmt.Sprintf("%s: ", appName))
 	log.SetFlags(0)
 
+	// Add a verbose flag
+	loglevel := int32(1)
+	// with also short version
+	verbose := flag.Bool("verbose", false, "Enable verbose logging (sets log level to 3)")
+	v := flag.Bool("v", false, "Enable verbose logging (sets log level to 3)")
+	debug := flag.Bool("debug", false, "Enable debug logging (sets log level to 4)")
+	d := flag.Bool("d", false, "Enable debug logging (sets log level to 4)")
+	flag.Parse()
+
+	if *verbose || *v {
+		loglevel = 3
+	} else if *debug || *d {
+		loglevel = 4
+	}
+
 	// Set ASL
 	aslConfig := &asl.ASLConfig{
-		LogLevel:       4,
+		LogLevel:       loglevel,
 		LoggingEnabled: true,
 	}
 	err := asl.ASLinit(aslConfig)
@@ -39,7 +55,7 @@ func main() {
 	}
 
 	err = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
-		LogLevel:       4,
+		LogLevel:       loglevel,
 		LoggingEnabled: true,
 	})
 	if err != nil {

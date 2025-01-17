@@ -34,7 +34,7 @@ type CustomLogCallback C.kritis3m_pki_log_callback
 
 // KRITIS3MPKIConfiguration represents the PKI configuration
 type KRITIS3MPKIConfiguration struct {
-	LogLevel          int
+	LogLevel          int32
 	LoggingEnabled    bool
 	CustomLogCallback CustomLogCallback
 }
