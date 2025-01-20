@@ -569,6 +569,9 @@ func newConfig(set *flag.FlagSet) (config, error) {
 
 	if libPath, ok := cfg.flags[pkcs11libFlag]; ok {
 		cfg.LibPath = fullPath(wd, libPath)
+		kritis3mpki.Kritis3mPKI.PKCS11Config.EntityModule.Path = cfg.LibPath
+		kritis3mpki.Kritis3mPKI.PKCS11Config.EntityModule.Slot = -1
+
 	}
 
 	// Process private key. Note that a private key located in a file is the

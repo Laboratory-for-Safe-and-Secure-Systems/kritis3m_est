@@ -42,7 +42,7 @@ type KRITIS3MPKIConfiguration struct {
 // PKCS11Module represents a PKCS#11 module configuration
 type PKCS11Module struct {
 	Path     string
-	Slot     uint
+	Slot     int
 	Pin      string
 	PinLen   int
 	DeviceID int
@@ -138,15 +138,13 @@ func InitPKI(config *KRITIS3MPKIConfiguration) error {
 
 // LoadPrivateKey loads a private key from a PEM-encoded buffer or PKCS#11 token
 func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string) (keyData []byte, err error) {
-	var pkcs11 bool
-	var pkcs11Identifier string
+	s.PrivateKey = C.privateKey_new()
 
 	keyData, err = os.ReadFile(keyFile)
-	if err != nil {
+	if err == nil {
 		// Check if the string starts with pkcs11:<IDENTIFIER>
-		if strings.HasPrefix(keyFile, PKCS11_LABEL_IDENTIFIER) {
-			pkcs11 = true
-			pkcs11Identifier = strings.TrimPrefix(keyFile, PKCS11_LABEL_IDENTIFIER)
+		if strings.HasPrefix(string(keyData), PKCS11_LABEL_IDENTIFIER) {
+			pkcs11Identifier := strings.TrimPrefix(string(keyData), PKCS11_LABEL_IDENTIFIER)
 			logger.Infof("Referencing external key with label \"%s\"", pkcs11Identifier)
 
 			// Initialize PKCS#11 token
@@ -166,29 +164,34 @@ func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string) (keyData []byte, err error)
 				return nil, fmt.Errorf("unable to set external reference: %v", err)
 			}
 		} else {
-			return nil, fmt.Errorf("failed to read key file: %w", err)
+			ret := C.privateKey_loadKeyFromBuffer(s.PrivateKey, (*C.uint8_t)(&keyData[0]), C.size_t(len(keyData)))
+			if ret != C.KRITIS3M_PKI_SUCCESS {
+				return nil, fmt.Errorf("PKI: failed to load private key: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
+			}
 		}
+	} else {
+		return nil, fmt.Errorf("failed to read key file: %w", err)
 	}
 
-	s.PrivateKey = C.privateKey_new()
-	if !pkcs11 {
-		ret := C.privateKey_loadKeyFromBuffer(s.PrivateKey, (*C.uint8_t)(&keyData[0]), C.size_t(len(keyData)))
-		if ret != C.KRITIS3M_PKI_SUCCESS {
-			return nil, fmt.Errorf("PKI: failed to load private key: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
-		}
-	}
 	return keyData, nil
 }
 
 // InitEntityToken initializes a PKCS#11 token for entity operations
-func (s *KRITIS3MPKI) initEntityToken(modulePath string, slot uint, pin []byte, pinLen int) (int, error) {
+func (s *KRITIS3MPKI) initEntityToken(modulePath string, slot int, pin []byte, pinLen int) (int, error) {
 	cModulePath := C.CString(modulePath)
 	defer C.free(unsafe.Pointer(cModulePath))
+
+	var cPin *C.uint8_t
+	if len(pin) > 0 {
+		cPin = (*C.uint8_t)(unsafe.Pointer(&pin[0]))
+	} else {
+		cPin = nil
+	}
 
 	deviceID := C.kritis3m_pki_init_entity_token(
 		cModulePath,
 		C.int(slot),
-		(*C.uint8_t)(unsafe.Pointer(&pin[0])),
+		cPin,
 		C.size_t(pinLen))
 
 	if deviceID < C.KRITIS3M_PKI_SUCCESS {
