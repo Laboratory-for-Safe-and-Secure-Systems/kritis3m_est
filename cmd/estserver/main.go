@@ -100,10 +100,26 @@ func main() {
 		log.Fatalf("failed to initialize PKI: %v", err)
 	}
 
+	// Load PKCS11 configuration
+	pcks11Config := kritis3mpki.PKCS11Config{
+		EntityModule: kritis3mpki.PKCS11Module{
+			Path:   cfg.RealCA.EntityModule.Path,
+			Pin:    cfg.RealCA.EntityModule.Pin,
+			PinLen: cfg.RealCA.EntityModule.PinLen,
+			Slot:   cfg.RealCA.EntityModule.Slot,
+		},
+		IssuerModule: kritis3mpki.PKCS11Module{
+			Path:   cfg.RealCA.IssuerModule.Path,
+			Pin:    cfg.RealCA.IssuerModule.Pin,
+			PinLen: cfg.RealCA.IssuerModule.PinLen,
+			Slot:   cfg.RealCA.IssuerModule.Slot,
+		},
+	}
+
 	// Create CA.
 	var ca *realca.RealCA
 	if cfg.RealCA != nil {
-		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key)
+		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key, pcks11Config)
 		if err != nil {
 			log.Fatalf("failed to create CA: %v", err)
 		}

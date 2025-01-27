@@ -19,18 +19,19 @@ type config struct {
 	Logfile             string          `json:"log_file"`
 }
 
-// PKCS11Config contains the PKCS#11 configuration
-type pkcs11Config struct {
-	Path string `json:"path"`
-	Slot uint   `json:"slot"`
-	Pin  string `json:"pin"`
+type PKCS11Module struct {
+	Path   string `json:"path"`
+	Slot   int    `json:"slot"`
+	Pin    string `json:"pin"`
+	PinLen int    `json:"pin_len"`
 }
 
 // RealCAConfig contains the real CA configuration.
 type realCAConfig struct {
-	Certs  string        `json:"certificates"`
-	Key    string        `json:"private_key"`
-	PKCS11 *pkcs11Config `json:"pkcs11,omitempty"`
+	Certs        string        `json:"certificates"`
+	Key          string        `json:"private_key"`
+	IssuerModule *PKCS11Module `json:"pkcs11_issuer_module,omitempty"`
+	EntityModule *PKCS11Module `json:"pkcs11_entity_module,omitempty"`
 }
 
 // tlsConfig contains the server's TLS configuration.

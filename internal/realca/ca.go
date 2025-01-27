@@ -94,12 +94,14 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 	}, nil
 }
 
-// Load CA certificates and key from PEM files.
-func Load(certFile, keyFile string) (*RealCA, error) {
+// Load CA certificates and key from PEM files. // Optionally, load PKCS#11
+func Load(certFile, keyFile string, pkcs11Config kritis3mpki.PKCS11Config) (*RealCA, error) {
 	certData, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate file: %w", err)
 	}
+
+	kritis3mpki.Kritis3mPKI.LoadPKCS11Config(pkcs11Config)
 
 	keyData, err := kritis3mpki.Kritis3mPKI.LoadPrivateKey(keyFile)
 	if err != nil {

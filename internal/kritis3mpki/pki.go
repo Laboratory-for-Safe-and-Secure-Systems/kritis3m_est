@@ -48,6 +48,11 @@ type PKCS11Module struct {
 	DeviceID int
 }
 
+type PKCS11Config struct {
+	EntityModule PKCS11Module
+	IssuerModule PKCS11Module
+}
+
 // KRITIS3MPKI represents the PKI configuration and operations
 type KRITIS3MPKI struct {
 	OutputCert    *C.OutputCert
@@ -56,10 +61,7 @@ type KRITIS3MPKI struct {
 	Error         *KRITIS3MPKIError
 	Configuration *KRITIS3MPKIConfiguration
 	CSR           *C.SigningRequest
-	PKCS11Config  struct {
-		EntityModule PKCS11Module
-		IssuerModule PKCS11Module
-	}
+	PKCS11Config  PKCS11Config
 }
 
 func (pc *KRITIS3MPKIConfiguration) toC() *C.kritis3m_pki_configuration {
@@ -136,6 +138,11 @@ func InitPKI(config *KRITIS3MPKIConfiguration) error {
 	return nil
 }
 
+// Load PKCS#11 configuration
+func (s *KRITIS3MPKI) LoadPKCS11Config(pkcs11Config PKCS11Config) {
+	s.PKCS11Config = pkcs11Config
+}
+
 // LoadPrivateKey loads a private key from a PEM-encoded buffer or PKCS#11 token
 func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string) (keyData []byte, err error) {
 	s.PrivateKey = C.privateKey_new()
@@ -146,6 +153,10 @@ func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string) (keyData []byte, err error)
 		if strings.HasPrefix(string(keyData), PKCS11_LABEL_IDENTIFIER) {
 			pkcs11Identifier := strings.TrimPrefix(string(keyData), PKCS11_LABEL_IDENTIFIER)
 			logger.Infof("Referencing external key with label \"%s\"", pkcs11Identifier)
+
+			if s.PKCS11Config.EntityModule.Path == "" || s.PKCS11Config.EntityModule.Slot == 0 {
+				return nil, fmt.Errorf("PKCS#11 configuration not set")
+			}
 
 			// Initialize PKCS#11 token
 			deviceID, err := s.initEntityToken(
