@@ -1,7 +1,7 @@
 package kritis3mpki
 
 /*
-#cgo pkg-config: --static kritis3m_pki_client
+#cgo pkg-config: --static kritis3m_pki_client kritis3m_pki_server
 #include "kritis3m_pki_server.h"
 #include "kritis3m_pki_client.h"
 #include "kritis3m_pki_common.h"
@@ -51,7 +51,7 @@ type PKCS11Module struct {
 // KRITIS3MPKI represents the PKI configuration and operations
 type KRITIS3MPKI struct {
 	OutputCert    *C.OutputCert
-	IssuerCert    *C.IssuerCert
+	IssuerCert    *C.InputCert
 	PrivateKey    *C.PrivateKey
 	Error         *KRITIS3MPKIError
 	Configuration *KRITIS3MPKIConfiguration
@@ -278,7 +278,7 @@ func (s *KRITIS3MPKI) Cleanup() {
 		C.outputCert_free(s.OutputCert)
 	}
 	if s.IssuerCert != nil {
-		C.issuerCert_free(s.IssuerCert)
+		C.inputCert_free(s.IssuerCert)
 	}
 	if s.PrivateKey != nil {
 		C.privateKey_free(s.PrivateKey)

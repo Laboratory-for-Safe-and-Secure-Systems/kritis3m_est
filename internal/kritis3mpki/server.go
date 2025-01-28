@@ -15,9 +15,9 @@ import (
 
 // LoadIssuerCert loads an issuer certificate from a PEM-encoded buffer
 func (s *KRITIS3MPKI) LoadIssuerCert(certData []byte) error {
-	s.IssuerCert = C.issuerCert_new()
+	s.IssuerCert = C.inputCert_new()
 
-	ret := C.issuerCert_initFromBuffer(s.IssuerCert, (*C.uint8_t)(&certData[0]), C.size_t(len(certData)), (*C.PrivateKey)(s.PrivateKey))
+	ret := C.inputCert_initFromBuffer(s.IssuerCert, (*C.uint8_t)(&certData[0]), C.size_t(len(certData)), (*C.PrivateKey)(s.PrivateKey))
 	if ret != C.KRITIS3M_PKI_SUCCESS {
 		return fmt.Errorf("PKI: failed to load issuer certificate: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
 	}

@@ -1,5 +1,5 @@
-github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.0.3 h1:8/XqWT1y07RDFmOB7aeWdCZ3fqYuuwnwGgymtx7iFqg=
-github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.0.3/go.mod h1:RmTEiDw/nn6udVXrlqRWyVIezynTqCIA4rsZoGwA2AU=
+github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.0.4 h1:adyUoYSM0tsCQRS/Tbzu1T2kAvQeILpLNwySA6uUkSA=
+github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.0.4/go.mod h1:pUxDWo2MRQ4ooveHjGSwqvedFLIDJFQp7IBVRmRxYPI=
 github.com/ThalesIgnite/crypto11 v1.2.5 h1:1IiIIEqYmBvUYFeMnHqRft4bwf/O36jryEUpY+9ef8E=
 github.com/ThalesIgnite/crypto11 v1.2.5/go.mod h1:ILDKtnCKiQ7zRoNxcp36Y1ZR8LBPmR2E23+wTQe/MlE=
 github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
