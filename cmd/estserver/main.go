@@ -67,6 +67,22 @@ func main() {
 		LogLevel:       int32(cfg.ASLConfig.LogLevel),
 	}
 
+	// Load PKCS11 configuration
+	pcks11Config := kritis3mpki.PKCS11Config{
+		EntityModule: kritis3mpki.PKCS11Module{
+			Path:   cfg.RealCA.EntityModule.Path,
+			Pin:    cfg.RealCA.EntityModule.Pin,
+			PinLen: cfg.RealCA.EntityModule.PinLen,
+			Slot:   cfg.RealCA.EntityModule.Slot,
+		},
+		IssuerModule: kritis3mpki.PKCS11Module{
+			Path:   cfg.RealCA.IssuerModule.Path,
+			Pin:    cfg.RealCA.IssuerModule.Pin,
+			PinLen: cfg.RealCA.IssuerModule.PinLen,
+			Slot:   cfg.RealCA.IssuerModule.Slot,
+		},
+	}
+
 	err = asl.ASLinit(libConfig)
 	if err != nil {
 		log.Fatalf("Error initializing ASL: %v", err)
@@ -84,6 +100,10 @@ func main() {
 		},
 		RootCertificate: asl.RootCertificate{Path: cfg.RealCA.Certs},
 		KeylogFile:      cfg.Endpoint.KeylogFile,
+		PKCS11: asl.PKCS11ASL{
+			Path: cfg.RealCA.EntityModule.Path,
+			Pin:  cfg.RealCA.EntityModule.Pin,
+		},
 	}
 
 	endpoint := asl.ASLsetupServerEndpoint(endpointConfig)
@@ -98,22 +118,6 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("failed to initialize PKI: %v", err)
-	}
-
-	// Load PKCS11 configuration
-	pcks11Config := kritis3mpki.PKCS11Config{
-		EntityModule: kritis3mpki.PKCS11Module{
-			Path:   cfg.RealCA.EntityModule.Path,
-			Pin:    cfg.RealCA.EntityModule.Pin,
-			PinLen: cfg.RealCA.EntityModule.PinLen,
-			Slot:   cfg.RealCA.EntityModule.Slot,
-		},
-		IssuerModule: kritis3mpki.PKCS11Module{
-			Path:   cfg.RealCA.IssuerModule.Path,
-			Pin:    cfg.RealCA.IssuerModule.Pin,
-			PinLen: cfg.RealCA.IssuerModule.PinLen,
-			Slot:   cfg.RealCA.IssuerModule.Slot,
-		},
 	}
 
 	// Create CA.
