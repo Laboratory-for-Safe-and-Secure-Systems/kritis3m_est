@@ -89,9 +89,12 @@ func main() {
 	}
 
 	endpointConfig := &asl.EndpointConfig{
-		MutualAuthentication:   cfg.Endpoint.MutualAuthentication,
-		NoEncryption:           cfg.Endpoint.NoEncryption,
-		ASLKeyExchangeMethod:   asl.ASLKeyExchangeMethod(cfg.Endpoint.ASLKeyExchangeMethod),
+		MutualAuthentication: cfg.Endpoint.MutualAuthentication,
+		NoEncryption:         cfg.Endpoint.NoEncryption,
+		ASLKeyExchangeMethod: asl.ASLKeyExchangeMethod(cfg.Endpoint.ASLKeyExchangeMethod),
+		PreSharedKey: asl.PreSharedKey{
+			Enable: false,
+		},
 		DeviceCertificateChain: asl.DeviceCertificateChain{Path: cfg.TLS.Certs},
 		PrivateKey: asl.PrivateKey{
 			Path: cfg.TLS.Key,

@@ -550,6 +550,9 @@ func (c *Client) makeHTTPClient() *http.Client {
 		MutualAuthentication: true,
 		NoEncryption:         false,
 		ASLKeyExchangeMethod: 0,
+		PreSharedKey: asl.PreSharedKey{
+			Enable: false,
+		},
 		PKCS11: asl.PKCS11ASL{
 			Path: c.LibPath,
 		},
