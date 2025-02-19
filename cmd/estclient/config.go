@@ -56,8 +56,9 @@ type config struct {
 // a hardware security module (HSM), a Trusted Platform Module (TPM) device,
 // or another source.
 type privateKey struct {
-	Path string
-	HSM  *hsmKey
+	Path   string
+	PKCS11 *kritis3m_pki.PKCS11Module
+	HSM    *hsmKey
 }
 
 // hsmKey is an HSM-resident private key.
@@ -243,7 +244,7 @@ func (cfg *config) CSRTemplate() (*x509.CertificateRequest, error) {
 func (k *privateKey) Get(baseDir string) (interface{}, func() error, error) {
 	switch {
 	case k.Path != "":
-		keyData, key, err := kritis3m_pki.Kritis3mPKI.LoadPrivateKey(fullPath(baseDir, k.Path), nil)
+		keyData, key, err := kritis3m_pki.Kritis3mPKI.LoadPrivateKey(fullPath(baseDir, k.Path), k.PKCS11)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load private key: %w", err)
 		}
@@ -569,15 +570,20 @@ func newConfig(set *flag.FlagSet) (config, error) {
 
 	if libPath, ok := cfg.flags[pkcs11libFlag]; ok {
 		cfg.LibPath = fullPath(wd, libPath)
-		kritis3m_pki.Kritis3mPKI.PKCS11.EntityModule.Path = cfg.LibPath
-		kritis3m_pki.Kritis3mPKI.PKCS11.EntityModule.Slot = -1
-
+		kritis3m_pki.Kritis3mPKI.PKCS11 = kritis3m_pki.PKCS11Config{
+			EntityModule: &kritis3m_pki.PKCS11Module{
+				Path: cfg.LibPath,
+				Pin:  "",
+				Slot: -1,
+			},
+			IssuerModule: nil,
+		}
 	}
 
 	// Process private key. Note that a private key located in a file is the
 	// only type which can be specified at the command line.
 	if filename, ok := cfg.flags[keyFlag]; ok {
-		cfg.PrivateKey = &privateKey{Path: fullPath(wd, filename)}
+		cfg.PrivateKey = &privateKey{Path: fullPath(wd, filename), PKCS11: kritis3m_pki.Kritis3mPKI.PKCS11.EntityModule}
 	}
 
 	if cfg.PrivateKey != nil {
