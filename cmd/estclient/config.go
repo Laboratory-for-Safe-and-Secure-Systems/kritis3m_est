@@ -18,7 +18,7 @@ import (
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3mpki"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
 	"github.com/ThalesIgnite/crypto11"
 	"golang.org/x/term"
 
@@ -150,14 +150,14 @@ func (cfg *config) GenerateCSR(key interface{}, tmpl *x509.CertificateRequest) (
 		}
 	}
 
-	err = kritis3mpki.Kritis3mPKI.CreateCSR(kritis3mpki.SigningRequestMetadata{
+	err = kritis3m_pki.Kritis3mPKI.CreateCSR(kritis3m_pki.SigningRequestMetadata{
 		CSR: tmpl,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate request: %v", err)
 	}
 
-	csr, err := kritis3mpki.Kritis3mPKI.FinalizeCSR()
+	csr, err := kritis3m_pki.Kritis3mPKI.FinalizeCSR()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize certificate request: %v", err)
 	}
@@ -243,12 +243,12 @@ func (cfg *config) CSRTemplate() (*x509.CertificateRequest, error) {
 func (k *privateKey) Get(baseDir string) (interface{}, func() error, error) {
 	switch {
 	case k.Path != "":
-		key, err := kritis3mpki.Kritis3mPKI.LoadPrivateKey(fullPath(baseDir, k.Path))
+		keyData, key, err := kritis3m_pki.Kritis3mPKI.LoadPrivateKey(fullPath(baseDir, k.Path), nil)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to load private key: %w", err)
 		}
-
-		return key, func() error { return nil }, nil
+		kritis3m_pki.Kritis3mPKI.EntityKey = key
+		return keyData, func() error { return nil }, nil
 
 	case k.HSM != nil:
 		return k.HSM.Get(baseDir)
@@ -488,7 +488,7 @@ func newConfig(set *flag.FlagSet) (config, error) {
 	}
 
 	// Initialize PKI
-	err = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
+	err = kritis3m_pki.InitPKI(&kritis3m_pki.KRITIS3MPKIConfiguration{
 		LogLevel:       loglevel,
 		LoggingEnabled: true,
 	})
@@ -569,8 +569,8 @@ func newConfig(set *flag.FlagSet) (config, error) {
 
 	if libPath, ok := cfg.flags[pkcs11libFlag]; ok {
 		cfg.LibPath = fullPath(wd, libPath)
-		kritis3mpki.Kritis3mPKI.PKCS11Config.EntityModule.Path = cfg.LibPath
-		kritis3mpki.Kritis3mPKI.PKCS11Config.EntityModule.Slot = -1
+		kritis3m_pki.Kritis3mPKI.PKCS11.EntityModule.Path = cfg.LibPath
+		kritis3m_pki.Kritis3mPKI.PKCS11.EntityModule.Slot = -1
 
 	}
 

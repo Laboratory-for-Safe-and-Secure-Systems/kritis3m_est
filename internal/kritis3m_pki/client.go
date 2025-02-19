@@ -1,4 +1,4 @@
-package kritis3mpki
+package kritis3m_pki
 
 /*
 #cgo pkg-config: --static kritis3m_pki_client
@@ -91,7 +91,7 @@ func (s *KRITIS3MPKI) CreateCSR(metadata SigningRequestMetadata) error {
 func (s *KRITIS3MPKI) FinalizeCSR() (*x509.CertificateRequest, error) {
 	var buffer [32 * 1024]byte
 	var bufferSize C.size_t = C.size_t(len(buffer))
-	s.Error.Code = int(C.signingRequest_finalize(s.CSR, s.PrivateKey, (*C.uint8_t)(&buffer[0]), &bufferSize))
+	s.Error.Code = int(C.signingRequest_finalize(s.CSR, s.EntityKey, (*C.uint8_t)(&buffer[0]), &bufferSize))
 	if s.Error.Code != KRITIS3M_PKI_SUCCESS {
 		return nil, s.Error
 	}

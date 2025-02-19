@@ -23,7 +23,7 @@ import (
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/db"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3mpki"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
 	"go.mozilla.org/pkcs7"
 )
 
@@ -57,10 +57,10 @@ const (
 // certificate to sign requests.
 // It uses Root 1 Intermediate 2 Entity hierarchy.
 type RealCA struct {
-	certs       []*x509.Certificate
-	key         interface{}
-	kritis3mpki *kritis3mpki.KRITIS3MPKI
-	database    *db.DB
+	certs        []*x509.Certificate
+	key          interface{}
+	kritis3m_pki *kritis3m_pki.KRITIS3MPKI
+	database     *db.DB
 }
 
 // New creates a new mock certificate authority. If more than one CA certificate
@@ -87,28 +87,31 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 	log.Println("Successfully connected to SQLite!")
 
 	return &RealCA{
-		certs:       cacerts,
-		key:         key,
-		kritis3mpki: kritis3mpki.Kritis3mPKI,
-		database:    database,
+		certs:        cacerts,
+		key:          key,
+		kritis3m_pki: kritis3m_pki.Kritis3mPKI,
+		database:     database,
 	}, nil
 }
 
 // Load CA certificates and key from PEM files. // Optionally, load PKCS#11
-func Load(certFile, keyFile string, pkcs11Config kritis3mpki.PKCS11Config) (*RealCA, error) {
+func Load(certFile string, keyFile string, pkcs11Config kritis3m_pki.PKCS11Config) (*RealCA, error) {
 	certData, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate file: %w", err)
 	}
 
-	kritis3mpki.Kritis3mPKI.LoadPKCS11Config(pkcs11Config)
+	kritis3m_pki.Kritis3mPKI.LoadPKCS11Config(pkcs11Config)
 
-	keyData, err := kritis3mpki.Kritis3mPKI.LoadPrivateKey(keyFile)
+	keyData, key, err := kritis3m_pki.Kritis3mPKI.LoadPrivateKey(keyFile, kritis3m_pki.Kritis3mPKI.PKCS11.IssuerModule)
+	if err == nil {
+		kritis3m_pki.Kritis3mPKI.IssuerKey = key
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}
 
-	err = kritis3mpki.Kritis3mPKI.LoadIssuerCert(certData)
+	err = kritis3m_pki.Kritis3mPKI.LoadIssuerCert(certData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load issuer cert: %w", err)
 	}
@@ -243,13 +246,13 @@ func (ca *RealCA) Enroll(
 	}
 
 	// Create certificate using aslPKI
-	err := kritis3mpki.Kritis3mPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration), false)
+	err := kritis3m_pki.Kritis3mPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
 
 	// Finalize the certificate
-	pemCertData, err := kritis3mpki.Kritis3mPKI.FinalizeCertificate()
+	pemCertData, err := kritis3m_pki.Kritis3mPKI.FinalizeCertificate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize certificate: %w", err)
 	}

@@ -16,7 +16,7 @@ import (
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3mpki"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
 )
 
@@ -68,18 +68,12 @@ func main() {
 	}
 
 	// Load PKCS11 configuration
-	pcks11Config := kritis3mpki.PKCS11Config{
-		EntityModule: kritis3mpki.PKCS11Module{
-			Path:   cfg.RealCA.EntityModule.Path,
-			Pin:    cfg.RealCA.EntityModule.Pin,
-			PinLen: cfg.RealCA.EntityModule.PinLen,
-			Slot:   cfg.RealCA.EntityModule.Slot,
-		},
-		IssuerModule: kritis3mpki.PKCS11Module{
-			Path:   cfg.RealCA.IssuerModule.Path,
-			Pin:    cfg.RealCA.IssuerModule.Pin,
-			PinLen: cfg.RealCA.IssuerModule.PinLen,
-			Slot:   cfg.RealCA.IssuerModule.Slot,
+	pkcs11Config := kritis3m_pki.PKCS11Config{
+		EntityModule: nil,
+		IssuerModule: &kritis3m_pki.PKCS11Module{
+			Path: cfg.RealCA.IssuerModule.Path,
+			Pin:  cfg.RealCA.IssuerModule.Pin,
+			Slot: cfg.RealCA.IssuerModule.Slot,
 		},
 	}
 
@@ -89,9 +83,9 @@ func main() {
 	}
 
 	endpointConfig := &asl.EndpointConfig{
-		MutualAuthentication: cfg.Endpoint.MutualAuthentication,
-		NoEncryption:         cfg.Endpoint.NoEncryption,
-		ASLKeyExchangeMethod: asl.ASLKeyExchangeMethod(cfg.Endpoint.ASLKeyExchangeMethod),
+		MutualAuthentication: cfg.TLS.ASLEndpoint.MutualAuthentication,
+		ASLKeyExchangeMethod: asl.ASLKeyExchangeMethod(cfg.TLS.ASLEndpoint.ASLKeyExchangeMethod),
+		Ciphersuites:         cfg.TLS.ASLEndpoint.Ciphersuites,
 		PreSharedKey: asl.PreSharedKey{
 			Enable: false,
 		},
@@ -102,10 +96,10 @@ func main() {
 			AdditionalKeyBuffer: nil,
 		},
 		RootCertificate: asl.RootCertificate{Path: cfg.RealCA.Certs},
-		KeylogFile:      cfg.Endpoint.KeylogFile,
+		KeylogFile:      cfg.TLS.ASLEndpoint.KeylogFile,
 		PKCS11: asl.PKCS11ASL{
-			Path: cfg.RealCA.EntityModule.Path,
-			Pin:  cfg.RealCA.EntityModule.Pin,
+			Path: cfg.TLS.EntityModule.Path,
+			Pin:  cfg.TLS.EntityModule.Pin,
 		},
 	}
 
@@ -115,7 +109,7 @@ func main() {
 		log.Fatalf("failed to setup server endpoint")
 	}
 
-	err = kritis3mpki.InitPKI(&kritis3mpki.KRITIS3MPKIConfiguration{
+	err = kritis3m_pki.InitPKI(&kritis3m_pki.KRITIS3MPKIConfiguration{
 		LogLevel:       int32(cfg.ASLConfig.LogLevel),
 		LoggingEnabled: true,
 	})
@@ -126,7 +120,7 @@ func main() {
 	// Create CA.
 	var ca *realca.RealCA
 	if cfg.RealCA != nil {
-		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key, pcks11Config)
+		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key, pkcs11Config)
 		if err != nil {
 			log.Fatalf("failed to create CA: %v", err)
 		}

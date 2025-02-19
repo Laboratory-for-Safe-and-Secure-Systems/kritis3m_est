@@ -548,8 +548,8 @@ func (c *Client) uri(endpoint string) string {
 func (c *Client) makeHTTPClient() *http.Client {
 	config := &asl.EndpointConfig{
 		MutualAuthentication: true,
-		NoEncryption:         false,
 		ASLKeyExchangeMethod: 0,
+		Ciphersuites:         []string{},
 		PreSharedKey: asl.PreSharedKey{
 			Enable: false,
 		},

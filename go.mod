@@ -3,7 +3,7 @@ module github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est
 go 1.23
 
 require (
-	github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.1.1
+	github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.1.2
 	github.com/ThalesIgnite/crypto11 v1.2.5
 	github.com/globalsign/pemfile v1.0.0
 	github.com/go-chi/chi/v5 v5.2.1

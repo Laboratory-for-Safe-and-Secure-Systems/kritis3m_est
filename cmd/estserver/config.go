@@ -8,53 +8,51 @@ import (
 
 // config contains the EST server configuration.
 type config struct {
-	RealCA              *realCAConfig   `json:"ca,omitempty"`
-	TLS                 *tlsConfig      `json:"tls,omitempty"`
-	Endpoint            *endpointConfig `json:"endpoint,omitempty"`
-	ASLConfig           *aslConfig      `json:"asl_config,omitempty"`
-	AllowedHosts        []string        `json:"allowed_hosts,omitempty"`
-	HealthCheckPassword string          `json:"healthcheck_password"`
-	RateLimit           int             `json:"rate_limit"`
-	Timeout             int             `json:"timeout"`
-	Logfile             string          `json:"log_file"`
+	RealCA              *realCAConfig `json:"ca,omitempty"`
+	TLS                 *tlsConfig    `json:"tls,omitempty"`
+	ASLConfig           *aslConfig    `json:"asl_config,omitempty"`
+	AllowedHosts        []string      `json:"allowed_hosts,omitempty"`
+	HealthCheckPassword string        `json:"healthcheck_password"`
+	RateLimit           int           `json:"rate_limit"`
+	Timeout             int           `json:"timeout"`
+	Logfile             string        `json:"log_file"`
 }
 
 type PKCS11Module struct {
-	Path   string `json:"path"`
-	Slot   int    `json:"slot"`
-	Pin    string `json:"pin"`
-	PinLen int    `json:"pin_len"`
+	Path string `json:"path"`
+	Slot int    `json:"slot,omitempty"`
+	Pin  string `json:"pin"`
 }
 
 // RealCAConfig contains the real CA configuration.
 type realCAConfig struct {
 	Certs        string        `json:"certificates"`
 	Key          string        `json:"private_key"`
-	IssuerModule *PKCS11Module `json:"pkcs11_issuer_module,omitempty"`
-	EntityModule *PKCS11Module `json:"pkcs11_entity_module,omitempty"`
+	IssuerModule *PKCS11Module `json:"pkcs11_module,omitempty"`
 }
 
 // tlsConfig contains the server's TLS configuration.
 type tlsConfig struct {
-	ListenAddr string   `json:"listen_address"`
-	Certs      string   `json:"certificates"`
-	Key        string   `json:"private_key"`
-	ClientCAs  []string `json:"client_cas,omitempty"`
+	ListenAddr   string             `json:"listen_address"`
+	Certs        string             `json:"certificates"`
+	Key          string             `json:"private_key"`
+	ClientCAs    []string           `json:"client_cas,omitempty"`
+	ASLEndpoint  *aslEndpointConfig `json:"asl_endpoint,omitempty"`
+	EntityModule *PKCS11Module      `json:"pkcs11_module,omitempty"`
 }
 
 // EndpointConfig contains the configuration for an EST endpoint.
-type endpointConfig struct {
-	MutualAuthentication bool   `json:"mutual_authentication"`
-	NoEncryption         bool   `json:"no_encryption"`
-	ASLKeyExchangeMethod int    `json:"asl_key_exchange_method"`
-	KeylogFile           string `json:"keylog_file"`
+type aslEndpointConfig struct {
+	MutualAuthentication bool     `json:"mutual_authentication,omitempty"`
+	Ciphersuites         []string `json:"ciphersuites,omitempty"`
+	ASLKeyExchangeMethod int      `json:"key_exchange_method,omitempty"`
+	KeylogFile           string   `json:"keylog_file,omitempty"`
 }
 
 // aslConfig contains the configuration for the ASL library.
 type aslConfig struct {
-	LoggingEnabled       bool `json:"logging_enabled"`
-	LogLevel             int  `json:"log_level"`
-	SecureElementSupport bool `json:"secure_element_support"`
+	LoggingEnabled bool `json:"logging_enabled"`
+	LogLevel       int  `json:"log_level"`
 }
 
 // configFromFile returns a new EST server configuration from a JSON-encoded
@@ -77,7 +75,7 @@ const sample = `{
     "ca": {
         "certificates": "/path/to/CA/certificates.pem",
         "private_key": "/path/to/CA/private/key.pem",
-        "pkcs11": {
+        "pkcs11_module": {
             "path": "/usr/lib/softhsm/libsofthsm2.so",
             "slot": 0,
             "pin": "1234"
@@ -91,20 +89,22 @@ const sample = `{
             "/path/to/first/client/CA/root/certificate.pem",
             "/path/to/second/client/CA/root/certificate.pem",
             "/path/to/third/client/CA/root/certificate.pem"
-        ]
-    },
-    "endpoint": {
-        "mutual_authentication": true,
-        "no_encryption": false,
-        "use_secure_element": false,
-        "secure_element_import_keys": false,
-        "hybrid_signature_mode": 3,
-        "keylog_file": "/path/to/keylog/file.txt"
+        ],
+	"asl_endpoint": {
+		"mutual_authentication": true,
+		"ciphersuites": ["TLS13-AES256-GCM-SHA384", "TLS13-CHACHA20-POLY1305-SHA256"],
+		"key_exchange_method": 0,
+		"keylog_file": "/path/to/keylog/file.txt"
+	},
+	"pkcs11_module": {
+            "path": "/usr/lib/softhsm/libsofthsm2.so",
+            "slot": 0,
+            "pin": "1234"
+        }
     },
     "asl_config": {
         "logging_enabled": true,
         "log_level": 3,
-        "secure_element_support": false
     },
     "allowed_hosts": [
         "localhost",

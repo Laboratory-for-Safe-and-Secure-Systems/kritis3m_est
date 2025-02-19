@@ -1,4 +1,4 @@
-package kritis3mpki
+package kritis3m_pki
 
 /*
 #cgo pkg-config: --static kritis3m_pki_client kritis3m_pki_server
@@ -45,24 +45,24 @@ type PKCS11Module struct {
 	Path     string
 	Slot     int
 	Pin      string
-	PinLen   int
 	DeviceID int
 }
 
 type PKCS11Config struct {
-	EntityModule PKCS11Module
-	IssuerModule PKCS11Module
+	EntityModule *PKCS11Module
+	IssuerModule *PKCS11Module
 }
 
 // KRITIS3MPKI represents the PKI configuration and operations
 type KRITIS3MPKI struct {
 	OutputCert    *C.OutputCert
 	IssuerCert    *C.InputCert
-	PrivateKey    *C.PrivateKey
+	IssuerKey     *C.PrivateKey
+	EntityKey     *C.PrivateKey
 	Error         *KRITIS3MPKIError
 	Configuration *KRITIS3MPKIConfiguration
 	CSR           *C.SigningRequest
-	PKCS11Config  PKCS11Config
+	PKCS11        PKCS11Config
 }
 
 func (pc *KRITIS3MPKIConfiguration) toC() *C.kritis3m_pki_configuration {
@@ -77,7 +77,7 @@ func (pc *KRITIS3MPKIConfiguration) toC() *C.kritis3m_pki_configuration {
 func (e *KRITIS3MPKIError) Error() string {
 	kritis3mError := C.GoString(C.kritis3m_pki_error_message(C.int(e.Code)))
 	logger.Debugf("Error code: %d, Error message: %s", e.Code, kritis3mError)
-	return fmt.Sprintf("%s", kritis3mError)
+	return kritis3mError
 }
 
 const (
@@ -141,7 +141,7 @@ func InitPKI(config *KRITIS3MPKIConfiguration) error {
 
 // Load PKCS#11 configuration
 func (s *KRITIS3MPKI) LoadPKCS11Config(pkcs11Config PKCS11Config) {
-	s.PKCS11Config = pkcs11Config
+	s.PKCS11 = pkcs11Config
 }
 
 // Function to extract the key label and a potential alt key label
@@ -171,8 +171,8 @@ func extractKeyLabel(keyData []byte) (string, string) {
 }
 
 // LoadPrivateKey loads a private key from a PEM-encoded buffer or PKCS#11 token
-func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string) (keyData []byte, err error) {
-	s.PrivateKey = C.privateKey_new()
+func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string, p11_module *PKCS11Module) (keyData []byte, key *C.PrivateKey, err error) {
+	key = C.privateKey_new()
 
 	keyData, err = os.ReadFile(keyFile)
 	if err == nil {
@@ -182,25 +182,20 @@ func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string) (keyData []byte, err error)
 
 			logger.Infof("Referencing external key with label \"%s\"", keyLabel)
 
-			if s.PKCS11Config.EntityModule.Path == "" || s.PKCS11Config.EntityModule.Slot == 0 {
-				return nil, fmt.Errorf("PKCS#11 configuration not set")
+			if p11_module == nil || p11_module.Path == "" || p11_module.Slot == 0 {
+				return nil, nil, fmt.Errorf("PKCS#11 configuration not set")
 			}
 
 			// Initialize PKCS#11 token
-			deviceID, err := s.initEntityToken(
-				s.PKCS11Config.EntityModule.Path,
-				s.PKCS11Config.EntityModule.Slot,
-				[]byte(s.PKCS11Config.EntityModule.Pin),
-				s.PKCS11Config.EntityModule.PinLen,
-			)
+			deviceID, err := s.InitPkcs11Token(p11_module)
 			if err != nil {
-				return nil, fmt.Errorf("unable to initialize entity token: %v", err)
+				return nil, nil, fmt.Errorf("unable to initialize PKCS11 token: %v", err)
 			}
-			s.PKCS11Config.EntityModule.DeviceID = deviceID
+			p11_module.DeviceID = deviceID
 
 			// Set external reference
-			if err := s.setExternalRef(keyLabel); err != nil {
-				return nil, fmt.Errorf("unable to set external reference: %v", err)
+			if err := s.setExternalRef(keyLabel, key, p11_module); err != nil {
+				return nil, nil, fmt.Errorf("unable to set external reference: %v", err)
 			}
 
 			// Check if an additional label for an alternative key is provided
@@ -208,40 +203,97 @@ func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string) (keyData []byte, err error)
 				logger.Infof("Referencing alternative key with label \"%s\"", altKeyLabel)
 
 				// Set external reference for alternative key
-				if err := s.setAltExternalRef(altKeyLabel); err != nil {
-					return nil, fmt.Errorf("unable to set external reference for alternative key: %v", err)
+				if err := s.setAltExternalRef(altKeyLabel, key, p11_module); err != nil {
+					return nil, nil, fmt.Errorf("unable to set external reference for alternative key: %v", err)
 				}
 			}
 		} else {
-			ret := C.privateKey_loadKeyFromBuffer(s.PrivateKey, (*C.uint8_t)(&keyData[0]), C.size_t(len(keyData)))
+			ret := C.privateKey_loadKeyFromBuffer(key, (*C.uint8_t)(&keyData[0]), C.size_t(len(keyData)))
 			if ret != C.KRITIS3M_PKI_SUCCESS {
-				return nil, fmt.Errorf("PKI: failed to load private key: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
+				return nil, nil, fmt.Errorf("PKI: failed to load private key: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
 			}
 		}
 	} else {
-		return nil, fmt.Errorf("failed to read key file: %w", err)
+		return nil, nil, fmt.Errorf("failed to read key file: %w", err)
 	}
 
-	return keyData, nil
+	return keyData, key, nil
 }
 
-// InitEntityToken initializes a PKCS#11 token for entity operations
-func (s *KRITIS3MPKI) initEntityToken(modulePath string, slot int, pin []byte, pinLen int) (int, error) {
-	cModulePath := C.CString(modulePath)
+// LoadPrivateKeyAlt loads an alternative private key
+func (s *KRITIS3MPKI) LoadPrivateKeyAlt(keyFile string, key *C.PrivateKey, p11_module *PKCS11Module) error {
+	if key == nil {
+		return fmt.Errorf("primary private key must be loaded first")
+	}
+
+	keyData, err := os.ReadFile(keyFile)
+	if err == nil {
+		// Check if the string starts with pkcs11:<IDENTIFIER>
+		if strings.HasPrefix(string(keyData), PKCS11_LABEL_IDENTIFIER) {
+			keyLabel, altKeyLabel := extractKeyLabel(keyData)
+
+			logger.Infof("Referencing external key with label \"%s\"", keyLabel)
+
+			if p11_module.Path == "" || p11_module.Slot == 0 {
+				return fmt.Errorf("PKCS#11 configuration not set")
+			}
+
+			// // Initialize PKCS#11 token
+			// deviceID, err := s.initEntityToken(
+			// 	s.PKCS11Config.EntityModule.Path,
+			// 	s.PKCS11Config.EntityModule.Slot,
+			// 	[]byte(s.PKCS11Config.EntityModule.Pin),
+			// 	s.PKCS11Config.EntityModule.PinLen,
+			// )
+			// if err != nil {
+			// 	return nil, fmt.Errorf("unable to initialize entity token: %v", err)
+			// }
+			// s.PKCS11Config.EntityModule.DeviceID = deviceID
+
+			// Set external reference
+			if err := s.setAltExternalRef(keyLabel, key, p11_module); err != nil {
+				return fmt.Errorf("unable to set external reference: %v", err)
+			}
+
+			// Check if an additional label for an alternative key is provided
+			if len(altKeyLabel) > 0 {
+				return fmt.Errorf("alt key label not allowed")
+			}
+		} else {
+			ret := C.privateKey_loadAltKeyFromBuffer(key, (*C.uint8_t)(&keyData[0]), C.size_t(len(keyData)))
+			if ret != C.KRITIS3M_PKI_SUCCESS {
+				return fmt.Errorf("PKI: failed to load alt private key: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
+			}
+		}
+	} else {
+		return fmt.Errorf("failed to read key file: %w", err)
+	}
+
+	return nil
+}
+
+// initPkcs11Token initializes a PKCS#11 token
+func (s *KRITIS3MPKI) InitPkcs11Token(p11_module *PKCS11Module) (int, error) {
+	cModulePath := C.CString(p11_module.Path)
 	defer C.free(unsafe.Pointer(cModulePath))
 
 	var cPin *C.uint8_t
-	if len(pin) > 0 {
-		cPin = (*C.uint8_t)(unsafe.Pointer(&pin[0]))
+	if len(p11_module.Pin) > 0 {
+		cPin = (*C.uint8_t)(unsafe.Pointer(&[]byte(p11_module.Pin)[0]))
 	} else {
 		cPin = nil
 	}
 
+	if p11_module.Slot <= 0 {
+		// Slot is either a positive integer or -1 (default)
+		p11_module.Slot = -1
+	}
+
 	deviceID := C.kritis3m_pki_init_entity_token(
 		cModulePath,
-		C.int(slot),
+		C.int(p11_module.Slot),
 		cPin,
-		C.size_t(pinLen))
+		C.size_t(len(p11_module.Pin)))
 
 	if deviceID < C.KRITIS3M_PKI_SUCCESS {
 		return 0, fmt.Errorf("failed to initialize entity token: %s (%d)",
@@ -251,31 +303,12 @@ func (s *KRITIS3MPKI) initEntityToken(modulePath string, slot int, pin []byte, p
 	return int(deviceID), nil
 }
 
-// InitIssuerToken initializes a PKCS#11 token for issuer operations
-func (s *KRITIS3MPKI) initIssuerToken(modulePath string, slot uint, pin []byte, pinLen int) (int64, error) {
-	cModulePath := C.CString(modulePath)
-	defer C.free(unsafe.Pointer(cModulePath))
-
-	deviceID := C.kritis3m_pki_init_issuer_token(
-		cModulePath,
-		C.int(slot),
-		(*C.uint8_t)(unsafe.Pointer(&pin[0])),
-		C.size_t(pinLen))
-
-	if deviceID < C.KRITIS3M_PKI_SUCCESS {
-		return 0, fmt.Errorf("failed to initialize issuer token: %s (%d)",
-			C.GoString(C.kritis3m_pki_error_message(C.int(deviceID))), deviceID)
-	}
-
-	return int64(deviceID), nil
-}
-
 // SetExternalRef sets an external reference for PKCS#11 key
-func (s *KRITIS3MPKI) setExternalRef(label string) error {
+func (s *KRITIS3MPKI) setExternalRef(label string, key *C.PrivateKey, p11_module *PKCS11Module) error {
 	cLabel := C.CString(label)
 	defer C.free(unsafe.Pointer(cLabel))
 
-	ret := C.privateKey_setExternalRef(s.PrivateKey, C.int(s.PKCS11Config.EntityModule.DeviceID), cLabel)
+	ret := C.privateKey_setExternalRef(key, C.int(p11_module.DeviceID), cLabel)
 	if ret != C.KRITIS3M_PKI_SUCCESS {
 		return fmt.Errorf("failed to set external reference: %s (%d)",
 			C.GoString(C.kritis3m_pki_error_message(ret)), ret)
@@ -283,11 +316,11 @@ func (s *KRITIS3MPKI) setExternalRef(label string) error {
 	return nil
 }
 
-func (s *KRITIS3MPKI) setAltExternalRef(label string) error {
+func (s *KRITIS3MPKI) setAltExternalRef(label string, key *C.PrivateKey, p11_module *PKCS11Module) error {
 	cLabel := C.CString(label)
 	defer C.free(unsafe.Pointer(cLabel))
 
-	ret := C.privateKey_setAltExternalRef(s.PrivateKey, C.int(s.PKCS11Config.EntityModule.DeviceID), cLabel)
+	ret := C.privateKey_setAltExternalRef(key, C.int(p11_module.DeviceID), cLabel)
 	if ret != C.KRITIS3M_PKI_SUCCESS {
 		return fmt.Errorf("failed to set alt external reference: %s (%d)",
 			C.GoString(C.kritis3m_pki_error_message(ret)), ret)
@@ -295,24 +328,12 @@ func (s *KRITIS3MPKI) setAltExternalRef(label string) error {
 	return nil
 }
 
-// LoadPrivateKeyAlt loads an alternative private key
-func (s *KRITIS3MPKI) LoadPrivateKeyAlt(keyData []byte) error {
-	if s.PrivateKey == nil {
-		return fmt.Errorf("primary private key must be loaded first")
-	}
-	ret := C.privateKey_loadAltKeyFromBuffer(s.PrivateKey, (*C.uint8_t)(&keyData[0]), C.size_t(len(keyData)))
-	if ret != C.KRITIS3M_PKI_SUCCESS {
-		return fmt.Errorf("PKI: failed to load alternative private key: %s", C.GoString(C.kritis3m_pki_error_message(ret)))
-	}
-	return nil
-}
-
 // GeneratePrivateKey generates a new private key
 func (s *KRITIS3MPKI) GeneratePrivateKey(algorithm Algorithm) error {
-	s.PrivateKey = C.privateKey_new()
+	s.EntityKey = C.privateKey_new()
 	cAlgorithm := C.CString(string(algorithm))
 	defer C.free(unsafe.Pointer(cAlgorithm))
-	s.Error.Code = int(C.privateKey_generateKey(s.PrivateKey, cAlgorithm))
+	s.Error.Code = int(C.privateKey_generateKey(s.EntityKey, cAlgorithm))
 	if s.Error.Code != KRITIS3M_PKI_SUCCESS {
 		return s.Error
 	}
@@ -321,12 +342,12 @@ func (s *KRITIS3MPKI) GeneratePrivateKey(algorithm Algorithm) error {
 
 // GeneratePrivateKeyAlt generates a new alternative private key
 func (s *KRITIS3MPKI) GeneratePrivateKeyAlt(algorithm Algorithm) error {
-	if s.PrivateKey == nil {
+	if s.EntityKey == nil {
 		return fmt.Errorf("primary private key must be generated first")
 	}
 	cAlgorithm := C.CString(string(algorithm))
 	defer C.free(unsafe.Pointer(cAlgorithm))
-	s.Error.Code = int(C.privateKey_generateAltKey(s.PrivateKey, cAlgorithm))
+	s.Error.Code = int(C.privateKey_generateAltKey(s.EntityKey, cAlgorithm))
 	if s.Error.Code != KRITIS3M_PKI_SUCCESS {
 		return s.Error
 	}
@@ -341,8 +362,11 @@ func (s *KRITIS3MPKI) Cleanup() {
 	if s.IssuerCert != nil {
 		C.inputCert_free(s.IssuerCert)
 	}
-	if s.PrivateKey != nil {
-		C.privateKey_free(s.PrivateKey)
+	if s.EntityKey != nil {
+		C.privateKey_free(s.EntityKey)
+	}
+	if s.IssuerKey != nil {
+		C.privateKey_free(s.IssuerKey)
 	}
 	if s.CSR != nil {
 		C.signingRequest_free(s.CSR)
