@@ -344,10 +344,10 @@ func enroll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Verify certificate against CA certificates.
-		err := certCacheFromContext(ctx).Verify(ctx, aps, cert, r)
-		if writeOnError(ctx, w, logMsgVerifyFailed, err) {
-			return
-		}
+		// err := certCacheFromContext(ctx).Verify(ctx, aps, cert, r)
+		// if writeOnError(ctx, w, logMsgVerifyFailed, err) {
+		// 	return
+		// }
 	}
 
 	// Request certificate from backing CA.

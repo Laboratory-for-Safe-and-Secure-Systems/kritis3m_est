@@ -563,8 +563,8 @@ func (c *Client) makeHTTPClient() *http.Client {
 			Path:                c.PrivateKeyPath,
 			AdditionalKeyBuffer: nil,
 		},
-		RootCertificate: asl.RootCertificate{
-			Path: c.ExplicitAnchor,
+		RootCertificates: asl.RootCertificates{
+			Paths: []string{c.ExplicitAnchor, c.ImplicitAnchor},
 		},
 		KeylogFile: "/tmp/keylog.txt",
 	}

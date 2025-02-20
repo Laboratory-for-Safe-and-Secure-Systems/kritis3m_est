@@ -181,6 +181,7 @@ func init() {
 				timeoutFlag,
 				verboseFlag,
 				debugFlag,
+				pkcs11libFlag,
 			},
 			extraFlags: [][]string{
 				csrFlags,
@@ -204,7 +205,6 @@ func init() {
 			longDesc:  reenrollDesc,
 			cmdFunc:   reenroll,
 			flags: []string{
-				pkcs11libFlag,
 				apsFlag,
 				certsFlag,
 				configFlag,
@@ -224,6 +224,7 @@ func init() {
 				timeoutFlag,
 				verboseFlag,
 				debugFlag,
+				pkcs11libFlag,
 			},
 			usageExtras: []func(io.Writer, int){
 				usageCopyCSR,

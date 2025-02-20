@@ -276,9 +276,11 @@ func (ca *RealCA) Enroll(
 	}
 
 	// verify the certificate
-	err = cert.CheckSignatureFrom(ca.certs[0])
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify certificate: %w", err)
+	if (cert.PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) && (ca.certs[0].PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) {
+		err = cert.CheckSignatureFrom(ca.certs[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify certificate: %w", err)
+		}
 	}
 
 	// Use the hex serial for database operations

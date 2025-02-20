@@ -95,8 +95,8 @@ func main() {
 			// TODO: only if the keys are in separate files
 			AdditionalKeyBuffer: nil,
 		},
-		RootCertificate: asl.RootCertificate{Path: cfg.RealCA.Certs},
-		KeylogFile:      cfg.TLS.ASLEndpoint.KeylogFile,
+		RootCertificates: asl.RootCertificates{Paths: cfg.TLS.ClientCAs},
+		KeylogFile:       cfg.TLS.ASLEndpoint.KeylogFile,
 		PKCS11: asl.PKCS11ASL{
 			Path: cfg.TLS.EntityModule.Path,
 			Pin:  cfg.TLS.EntityModule.Pin,
@@ -194,4 +194,5 @@ func main() {
 
 	/* Cleanup the wolfSSL environment */
 	asl.ASLFreeEndpoint(endpoint)
+	asl.ASLshutdown()
 }
