@@ -596,6 +596,18 @@ func newConfig(set *flag.FlagSet) (config, error) {
 		cfg.closeFuncs = append(cfg.closeFuncs, closeFunc)
 	}
 
+	aslCloseFunc := func() error {
+		asl.ASLshutdown()
+		return nil
+	}
+	pkiCloseFunc := func() error {
+		kritis3m_pki.Kritis3mPKI.Cleanup()
+		return nil
+	}
+
+	cfg.closeFuncs = append(cfg.closeFuncs, aslCloseFunc)
+	cfg.closeFuncs = append(cfg.closeFuncs, pkiCloseFunc)
+
 	return cfg, nil
 }
 
