@@ -182,7 +182,7 @@ func (s *KRITIS3MPKI) LoadPrivateKey(keyFile string, p11_module *PKCS11Module) (
 
 			logger.Infof("Referencing external key with label \"%s\"", keyLabel)
 
-			if p11_module == nil || p11_module.Path == "" || p11_module.Slot == 0 {
+			if p11_module == nil || p11_module.Path == "" {
 				return nil, nil, fmt.Errorf("PKCS#11 configuration not set")
 			}
 
@@ -234,21 +234,16 @@ func (s *KRITIS3MPKI) LoadPrivateKeyAlt(keyFile string, key *C.PrivateKey, p11_m
 
 			logger.Infof("Referencing external key with label \"%s\"", keyLabel)
 
-			if p11_module.Path == "" || p11_module.Slot == 0 {
+			if p11_module == nil || p11_module.Path == "" {
 				return fmt.Errorf("PKCS#11 configuration not set")
 			}
 
-			// // Initialize PKCS#11 token
-			// deviceID, err := s.initEntityToken(
-			// 	s.PKCS11Config.EntityModule.Path,
-			// 	s.PKCS11Config.EntityModule.Slot,
-			// 	[]byte(s.PKCS11Config.EntityModule.Pin),
-			// 	s.PKCS11Config.EntityModule.PinLen,
-			// )
-			// if err != nil {
-			// 	return nil, fmt.Errorf("unable to initialize entity token: %v", err)
-			// }
-			// s.PKCS11Config.EntityModule.DeviceID = deviceID
+			// Initialize PKCS#11 token
+			deviceID, err := s.InitPkcs11Token(p11_module)
+			if err != nil {
+				return fmt.Errorf("unable to initialize PKCS11 token: %v", err)
+			}
+			p11_module.DeviceID = deviceID
 
 			// Set external reference
 			if err := s.setAltExternalRef(keyLabel, key, p11_module); err != nil {
