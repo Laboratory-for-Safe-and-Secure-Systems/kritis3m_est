@@ -2,25 +2,24 @@ package db
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"reflect"
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 type DB struct {
-	conn *gorm.DB
+	conn   *gorm.DB
+	logger est.Logger
 }
 
 // NewDB creates a new DB instance and initializes the database connection (SQLite or PostgreSQL).
-func NewDB(dbType string, dsn string) (*DB, error) {
+func NewDB(dbType string, dsn string, estLogger est.Logger) (*DB, error) {
 	var db *gorm.DB
 	var err error
-	estLogger := alogger.New(os.Stderr)
 	logger := alogger.NewGormLogger(estLogger)
 
 	// Connect to the appropriate database based on the dbType
@@ -43,7 +42,7 @@ func NewDB(dbType string, dsn string) (*DB, error) {
 		return nil, fmt.Errorf("unsupported database type: %s", dbType)
 	}
 
-	database := &DB{conn: db}
+	database := &DB{conn: db, logger: estLogger}
 
 	// Run migrations using reflection
 	err = database.AutoMigrateWithReflection()
@@ -51,7 +50,7 @@ func NewDB(dbType string, dsn string) (*DB, error) {
 		return nil, err
 	}
 
-	log.Println("Database migration successful!")
+	estLogger.Infof("Database migration successful!")
 	return database, nil
 }
 
@@ -73,14 +72,14 @@ func (db *DB) AutoMigrateWithReflection() error {
 			modelType = modelType.Elem()
 		}
 
-		log.Printf("Migrating model: %s", modelType.Name())
+		db.logger.Infof("Migrating model: %s", modelType.Name())
 		err := db.conn.AutoMigrate(model)
 		if err != nil {
 			return fmt.Errorf("failed to migrate model %s: %w", modelType.Name(), err)
 		}
 	}
 
-	log.Println("Database schema migration completed for all models!")
+	db.logger.Infof("Database schema migration completed for all models!")
 	return nil
 }
 

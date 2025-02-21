@@ -18,6 +18,7 @@ import (
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -61,10 +62,24 @@ func main() {
 		log.Fatalf("No configuration file specified")
 	}
 
+	aslLogLevel := asl.ASL_LOG_LEVEL_WRN
+	switch cfg.LogLevel {
+	case 1:
+		aslLogLevel = asl.ASL_LOG_LEVEL_ERR
+	case 2:
+		aslLogLevel = asl.ASL_LOG_LEVEL_WRN
+	case 3:
+		aslLogLevel = asl.ASL_LOG_LEVEL_INF
+	case 4:
+		aslLogLevel = asl.ASL_LOG_LEVEL_DBG
+	default:
+		log.Fatalf("Invalid log level: %d", cfg.LogLevel)
+	}
+
 	// Create and configure the library configuration
 	libConfig := &asl.ASLConfig{
-		LoggingEnabled: cfg.ASLConfig.LoggingEnabled,
-		LogLevel:       int32(cfg.ASLConfig.LogLevel),
+		LoggingEnabled: true,
+		LogLevel:       int32(aslLogLevel),
 	}
 
 	// Load PKCS11 configuration
@@ -109,36 +124,64 @@ func main() {
 		log.Fatalf("failed to setup server endpoint")
 	}
 
+	pkiLogLevel := kritis3m_pki.KRITIS3M_PKI_LOG_LEVEL_WRN
+	switch cfg.LogLevel {
+	case 1:
+		pkiLogLevel = kritis3m_pki.KRITIS3M_PKI_LOG_LEVEL_ERR
+	case 2:
+		pkiLogLevel = kritis3m_pki.KRITIS3M_PKI_LOG_LEVEL_WRN
+	case 3:
+		pkiLogLevel = kritis3m_pki.KRITIS3M_PKI_LOG_LEVEL_INF
+	case 4:
+		pkiLogLevel = kritis3m_pki.KRITIS3M_PKI_LOG_LEVEL_DBG
+	default:
+		log.Fatalf("Invalid log level: %d", cfg.LogLevel)
+	}
+
 	err = kritis3m_pki.InitPKI(&kritis3m_pki.KRITIS3MPKIConfiguration{
-		LogLevel:       int32(cfg.ASLConfig.LogLevel),
+		LogLevel:       int32(pkiLogLevel),
 		LoggingEnabled: true,
 	})
 	if err != nil {
 		log.Fatalf("failed to initialize PKI: %v", err)
 	}
 
-	// Create CA.
-	var ca *realca.RealCA
-	if cfg.RealCA != nil {
-		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key, pkcs11Config)
-		if err != nil {
-			log.Fatalf("failed to create CA: %v", err)
-		}
-	} else {
-		log.Fatalf("No CA defined in configuration file")
+	estLogLevel := zerolog.WarnLevel
+	switch cfg.LogLevel {
+	case 1:
+		estLogLevel = zerolog.ErrorLevel
+	case 2:
+		estLogLevel = zerolog.WarnLevel
+	case 3:
+		estLogLevel = zerolog.InfoLevel
+	case 4:
+		estLogLevel = zerolog.DebugLevel
+	default:
+		log.Fatalf("Invalid log level: %d", cfg.LogLevel)
 	}
 
 	// Create logger. If no log file was specified, log to standard error.
 	var logger est.Logger
 	if cfg.Logfile == "" {
-		logger = alogger.New(os.Stderr)
+		logger = alogger.New(os.Stderr, estLogLevel)
 	} else {
 		f, err := os.OpenFile(cfg.Logfile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatalf("failed to open log file: %v", err)
 		}
-		logger = alogger.New(f)
+		logger = alogger.New(f, estLogLevel)
 		defer f.Close()
+	}
+
+	// Create CA.
+	var ca *realca.RealCA
+	if cfg.RealCA != nil {
+		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key, logger, pkcs11Config)
+		if err != nil {
+			log.Fatalf("failed to create CA: %v", err)
+		}
+	} else {
+		log.Fatalf("No CA defined in configuration file")
 	}
 
 	// Create server TLS configuration. If a server TLS configuration was

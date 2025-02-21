@@ -15,6 +15,8 @@ import (
 	"unsafe"
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -22,8 +24,6 @@ const (
 	PKCS11_LABEL_IDENTIFIER_LEN = len(PKCS11_LABEL_IDENTIFIER)
 	PKCS11_LABEL_TERMINATOR     = "\r\n"
 )
-
-var logger = alogger.New(os.Stderr)
 
 // KRITIS3MPKIError represents a PKI error
 type KRITIS3MPKIError struct {
@@ -120,6 +120,7 @@ const (
 	ALGORITHMMLDSA87 Algorithm = "mldsa87"
 )
 
+var logger est.Logger
 var Kritis3mPKI *KRITIS3MPKI
 
 // Create instance of PKI globally
@@ -135,6 +136,20 @@ func InitPKI(config *KRITIS3MPKIConfiguration) error {
 		Configuration: config,
 		Error:         &KRITIS3MPKIError{},
 	}
+
+	logLevel := zerolog.WarnLevel
+
+	switch config.LogLevel {
+	case KRITIS3M_PKI_LOG_LEVEL_ERR:
+		logLevel = zerolog.ErrorLevel
+	case KRITIS3M_PKI_LOG_LEVEL_WRN:
+		logLevel = zerolog.WarnLevel
+	case KRITIS3M_PKI_LOG_LEVEL_INF:
+		logLevel = zerolog.InfoLevel
+	case KRITIS3M_PKI_LOG_LEVEL_DBG:
+		logLevel = zerolog.DebugLevel
+	}
+	logger = alogger.New(os.Stderr, logLevel)
 
 	return nil
 }

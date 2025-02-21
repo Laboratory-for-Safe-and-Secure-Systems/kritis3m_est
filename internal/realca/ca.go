@@ -12,7 +12,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 	"net/http"
 	"os"
@@ -20,14 +19,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/db"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
 	"go.mozilla.org/pkcs7"
 )
-
-var logger = alogger.New(os.Stderr)
 
 // Global variables.
 var (
@@ -61,13 +57,14 @@ type RealCA struct {
 	key          interface{}
 	kritis3m_pki *kritis3m_pki.KRITIS3MPKI
 	database     *db.DB
+	logger       est.Logger
 }
 
 // New creates a new mock certificate authority. If more than one CA certificate
 // is provided, they should be in order with the issuing (intermediate) CA
 // certificate first, and the root CA certificate last. The private key should
 // be associated with the public key in the first, issuing CA certificate.
-func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
+func New(cacerts []*x509.Certificate, key interface{}, logger est.Logger) (*RealCA, error) {
 	if len(cacerts) < 1 {
 		return nil, errors.New("no CA certificates provided")
 	} else if key == nil {
@@ -80,22 +77,23 @@ func New(cacerts []*x509.Certificate, key interface{}) (*RealCA, error) {
 		}
 	}
 
-	database, err := db.NewDB("sqlite", "test.db")
+	database, err := db.NewDB("sqlite", "test.db", logger)
 	if err != nil {
-		log.Fatalf("failed to connect to sqlite database: %v", err)
+		return nil, fmt.Errorf("failed to connect to sqlite database: %w", err)
 	}
-	log.Println("Successfully connected to SQLite!")
+	logger.Infof("Successfully connected to SQLite!")
 
 	return &RealCA{
 		certs:        cacerts,
 		key:          key,
 		kritis3m_pki: kritis3m_pki.Kritis3mPKI,
 		database:     database,
+		logger:       logger,
 	}, nil
 }
 
 // Load CA certificates and key from PEM files. // Optionally, load PKCS#11
-func Load(certFile string, keyFile string, pkcs11Config kritis3m_pki.PKCS11Config) (*RealCA, error) {
+func Load(certFile string, keyFile string, logger est.Logger, pkcs11Config kritis3m_pki.PKCS11Config) (*RealCA, error) {
 	certData, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate file: %w", err)
@@ -122,9 +120,9 @@ func Load(certFile string, keyFile string, pkcs11Config kritis3m_pki.PKCS11Confi
 		return nil, fmt.Errorf("failed to parse certificates: %w", err)
 	}
 
-	log.Printf("Loaded CA certificates and key from %s and %s", certFile, keyFile)
+	logger.Infof("Loaded CA certificates and key from %s and %s", certFile, keyFile)
 
-	return New(certs, keyData)
+	return New(certs, keyData, logger)
 }
 
 func parseCertificates(certData []byte) ([]*x509.Certificate, error) {
@@ -285,9 +283,9 @@ func (ca *RealCA) Enroll(
 
 	// Use the hex serial for database operations
 	hexSerialString := strings.ToUpper(cert.SerialNumber.Text(16))
-	logger.Debugf("Serial number: %s", hexSerialString)
+	ca.logger.Debugf("Serial number: %s", hexSerialString)
 	subjectFromDB, found := ca.database.GetSubject(cert.Subject.CommonName)
-	logger.Debugf("Subject from DB: %v", subjectFromDB.CommonName)
+	ca.logger.Debugf("Subject from DB: %v", subjectFromDB.CommonName)
 
 	if found {
 		err = ca.database.UpdateSubject(cert.Subject.CommonName, map[string]interface{}{
@@ -304,11 +302,11 @@ func (ca *RealCA) Enroll(
 			return nil, fmt.Errorf("failed to save certificate: %w", err)
 		}
 
-		logger.Infof("Certificate reenrolled for %s with serial number %s", cert.Subject.CommonName, hexSerialString)
+		ca.logger.Infof("Certificate reenrolled for %s with serial number %s", cert.Subject.CommonName, hexSerialString)
 
 		ca.database.DisablePreviousCerts(cert.Subject.CommonName, hexSerialString)
 
-		logger.Debugf("Revoking previous certificates for %s", cert.Subject.CommonName)
+		ca.logger.Debugf("Revoking previous certificates for %s", cert.Subject.CommonName)
 	} else {
 		err = ca.database.SaveCertificateFromSubject(cert.Subject.CommonName, *cert)
 		if err != nil {
@@ -499,7 +497,7 @@ func (ca *RealCA) RevocationList(ctx context.Context, r *http.Request) ([]byte, 
 
 	// Save the request to the database
 	if err := ca.database.SaveHTTPRequest(r); err != nil {
-		log.Printf("Failed to save HTTP request: %v", err)
+		ca.logger.Errorf("Failed to save HTTP request: %v", err)
 	}
 
 	return list, nil

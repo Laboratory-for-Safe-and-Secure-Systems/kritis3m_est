@@ -7,20 +7,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"gorm.io/gorm"
 )
-
-var logger = alogger.New(os.Stderr)
 
 func (db *DB) SaveHTTPRequest(r *http.Request) error {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		logger.Errorf("Failed to read request body: %v", err)
+		db.logger.Errorf("Failed to read request body: %v", err)
 		return err
 	}
 	body := string(bodyBytes)
@@ -44,7 +40,7 @@ func (db *DB) SaveHTTPRequest(r *http.Request) error {
 
 	err = db.Create(&requestRecord)
 	if err != nil {
-		logger.Errorf("Failed to save HTTP request to database: %v", err)
+		db.logger.Errorf("Failed to save HTTP request to database: %v", err)
 		return err
 	}
 
@@ -65,7 +61,7 @@ func (db *DB) saveCertificate(tx *gorm.DB, c *CertificateWithStatus) error {
 		len(cert.Subject.Organization) == 0 || cert.NotBefore.IsZero() ||
 		cert.NotAfter.IsZero() || cert.RawSubjectPublicKeyInfo == nil ||
 		cert.SignatureAlgorithm == 0 {
-		// logger.Errorf("Empty fields in certificate, prefilling with default values")
+		// db.logger.Errorf("Empty fields in certificate, prefilling with default values")
 		// prefill the missing fields
 		if cert.SerialNumber == nil {
 			return fmt.Errorf("serial number is nil")
@@ -92,7 +88,7 @@ func (db *DB) saveCertificate(tx *gorm.DB, c *CertificateWithStatus) error {
 
 	for _, ext := range cert.Extensions {
 		if !ext.Critical && ext.Id.Equal(asn1.ObjectIdentifier{2, 5, 29, 72}) {
-			logger.Debugf("Extension OID: %v", ext.Id)
+			db.logger.Debugf("Extension OID: %v", ext.Id)
 			algo = "ECDSA-SHA256 ML-DSA44 (Hybrid PQC)"
 		} else {
 			algo = cert.SignatureAlgorithm.String()
@@ -116,7 +112,7 @@ func (db *DB) saveCertificate(tx *gorm.DB, c *CertificateWithStatus) error {
 	// Use the transaction (tx) to create the record instead of db.Create
 	err := tx.Create(&certificate).Error
 	if err != nil {
-		logger.Errorf("Failed to save certificate to database: %v", err)
+		db.logger.Errorf("Failed to save certificate to database: %v", err)
 		tx.Rollback()
 		return err
 	}
@@ -132,7 +128,7 @@ func (db *DB) SaveCertificateFromSubject(subject string, cert x509.Certificate) 
 		result := tx.Where("common_name = ?", subject).First(&subjectRecord)
 		if result.Error != nil {
 			if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-				logger.Errorf("Failed to query subject: %v", result.Error)
+				db.logger.Errorf("Failed to query subject: %v", result.Error)
 				return result.Error
 			}
 
@@ -142,10 +138,10 @@ func (db *DB) SaveCertificateFromSubject(subject string, cert x509.Certificate) 
 			}
 			err := tx.Create(&subjectRecord).Error
 			if err != nil {
-				logger.Errorf("Failed to create subject: %v", err)
+				db.logger.Errorf("Failed to create subject: %v", err)
 				return err
 			}
-			logger.Infof("Subject %s not found, creating a new one", subject)
+			db.logger.Infof("Subject %s not found, creating a new one", subject)
 		}
 
 		// Prepare a CertificateWithStatus struct for the certificate
@@ -157,7 +153,7 @@ func (db *DB) SaveCertificateFromSubject(subject string, cert x509.Certificate) 
 		// Call SaveCertificate to save the certificate (this will save the certificate in the database)
 		err := db.saveCertificate(tx, certificateWithStatus)
 		if err != nil {
-			logger.Errorf("Failed to save certificate: %v", err)
+			db.logger.Errorf("Failed to save certificate: %v", err)
 			return err
 		}
 
@@ -165,14 +161,14 @@ func (db *DB) SaveCertificateFromSubject(subject string, cert x509.Certificate) 
 		var savedCertificate Certificate
 		err = tx.Where("serial_number = ?", strings.ToUpper(cert.SerialNumber.Text(16))).First(&savedCertificate).Error
 		if err != nil {
-			logger.Errorf("Failed to retrieve saved certificate: %v", err)
+			db.logger.Errorf("Failed to retrieve saved certificate: %v", err)
 			return err
 		}
 
 		// Link the retrieved certificate to the subject
 		err = tx.Model(&subjectRecord).Association("Certificates").Append(&savedCertificate)
 		if err != nil {
-			logger.Errorf("Failed to link certificate to subject: %v", err)
+			db.logger.Errorf("Failed to link certificate to subject: %v", err)
 			return err
 		}
 
@@ -193,7 +189,7 @@ func (db *DB) SaveCSR(csr *x509.CertificateRequest) error {
 
 	err := db.Create(&certificateRequest)
 	if err != nil {
-		logger.Errorf("Failed to save CSR to database: %v", err)
+		db.logger.Errorf("Failed to save CSR to database: %v", err)
 		return err
 	}
 
@@ -210,7 +206,7 @@ func (db *DB) SaveRevocation(certID uint, reason string) error {
 
 	err := db.Create(&revocation)
 	if err != nil {
-		logger.Errorf("Failed to save revocation to database: %v", err)
+		db.logger.Errorf("Failed to save revocation to database: %v", err)
 		return err
 	}
 
@@ -222,13 +218,13 @@ func (db *DB) UpdateCertificate(serialNumber string, updates map[string]interfac
 	var certificate Certificate
 	result := db.conn.Where("serial_number = ?", serialNumber).First(&certificate)
 	if result.Error != nil {
-		logger.Errorf("Failed to find certificate for update: %v", result.Error)
+		db.logger.Errorf("Failed to find certificate for update: %v", result.Error)
 		return result.Error
 	}
 
 	result = db.conn.Model(&certificate).Updates(updates)
 	if result.Error != nil {
-		logger.Errorf("Failed to update certificate: %v", result.Error)
+		db.logger.Errorf("Failed to update certificate: %v", result.Error)
 		return result.Error
 	}
 
@@ -239,13 +235,13 @@ func (db *DB) UpdateSubject(commonName string, updates map[string]interface{}) e
 	var subject Subject
 	result := db.conn.Where("common_name = ?", commonName).First(&subject)
 	if result.Error != nil {
-		logger.Errorf("Failed to find subject for update: %v", result.Error)
+		db.logger.Errorf("Failed to find subject for update: %v", result.Error)
 		return result.Error
 	}
 
 	result = db.conn.Model(&subject).Updates(updates)
 	if result.Error != nil {
-		logger.Errorf("Failed to update subject: %v", result.Error)
+		db.logger.Errorf("Failed to update subject: %v", result.Error)
 		return result.Error
 	}
 
@@ -256,7 +252,7 @@ func (db *DB) UpdateSubject(commonName string, updates map[string]interface{}) e
 func (db *DB) GetSubject(commonName string) (subject Subject, found bool) {
 	result := db.conn.Where("common_name = ?", commonName).First(&subject)
 	if result.Error != nil {
-		logger.Infof("No subject found: %v", result.Error)
+		db.logger.Infof("No subject found: %v", result.Error)
 		return subject, false
 	}
 
@@ -267,7 +263,7 @@ func (db *DB) GetSubject(commonName string) (subject Subject, found bool) {
 func (db *DB) GetCertificate(serialNumber string) (certificate Certificate, found bool) {
 	result := db.conn.Where("serial_number = ?", serialNumber).First(&certificate)
 	if result.Error != nil {
-		logger.Errorf("Failed to find certificate: %v", result.Error)
+		db.logger.Errorf("Failed to find certificate: %v", result.Error)
 		return certificate, false
 	}
 
@@ -282,11 +278,11 @@ func (db *DB) GetRevocations() ([]Certificate, bool) {
 	result := db.conn.Where("status = ?", "revoked").Find(&revocation)
 
 	if result.Error != nil {
-		logger.Errorf("Failed to find revoked certificates: %v", result.Error)
+		db.logger.Errorf("Failed to find revoked certificates: %v", result.Error)
 		return revocation, false
 	}
 
-	logger.Debugf("Found %d revoked certificates", len(revocation))
+	db.logger.Debugf("Found %d revoked certificates", len(revocation))
 
 	return revocation, true
 }
@@ -300,11 +296,11 @@ func (db *DB) DisablePreviousCerts(commonName string, serialNumber string) error
 		err := tx.Where("common_name = ? AND status = ?", commonName, CertificateStatusActive).
 			Order("issued_at desc").First(&lastCert).Error
 		if err != nil {
-			logger.Errorf("Failed to find last certificate: %v", err)
+			db.logger.Errorf("Failed to find last certificate: %v", err)
 			return err
 		}
 
-		logger.Debugf("Last certificate: %s", lastCert.SerialNumber)
+		db.logger.Infof("Revoking last certificate: %s", lastCert.SerialNumber)
 
 		// Disable all older certificates (except the latest one)
 		err = tx.Model(&Certificate{}).
@@ -315,7 +311,7 @@ func (db *DB) DisablePreviousCerts(commonName string, serialNumber string) error
 				"revoked_reason": "superseded by new certificate with serial number " + serialNumber,
 			}).Error
 		if err != nil {
-			logger.Errorf("Failed to disable previous certificates: %v", err)
+			db.logger.Errorf("Failed to disable previous certificates: %v", err)
 			return err
 		}
 
@@ -323,7 +319,7 @@ func (db *DB) DisablePreviousCerts(commonName string, serialNumber string) error
 		var revokedCerts []Certificate
 		err = tx.Where("common_name = ? AND status = ?", commonName, CertificateStatusRevoked).Find(&revokedCerts).Error
 		if err != nil {
-			logger.Errorf("Failed to find revoked certificates: %v", err)
+			db.logger.Errorf("Failed to find revoked certificates: %v", err)
 			return err
 		}
 
@@ -332,7 +328,7 @@ func (db *DB) DisablePreviousCerts(commonName string, serialNumber string) error
 		for _, cert := range revokedCerts {
 			revokedSerials += cert.SerialNumber + ", "
 		}
-		logger.Infof("Revoked certificates: %s", revokedSerials)
+		db.logger.Debugf("Revoked certificates: %s", revokedSerials)
 
 		return nil
 	})
@@ -343,12 +339,12 @@ func (db *DB) GetCertificates() []Certificate {
 	var certificates []Certificate
 	result := db.conn.Find(&certificates)
 	if result.Error != nil {
-		logger.Errorf("Failed to find certificates: %v", result.Error)
+		db.logger.Errorf("Failed to find certificates: %v", result.Error)
 		return nil
 	}
 
 	if len(certificates) == 0 {
-		logger.Infof("No certificates found")
+		db.logger.Infof("No certificates found")
 	}
 
 	return certificates
@@ -359,12 +355,12 @@ func (db *DB) GetSubjects() []Subject {
 	var subjects []Subject
 	result := db.conn.Find(&subjects)
 	if result.Error != nil {
-		logger.Errorf("Failed to find subjects: %v", result.Error)
+		db.logger.Errorf("Failed to find subjects: %v", result.Error)
 		return nil
 	}
 
 	if len(subjects) == 0 {
-		logger.Infof("No subjects found")
+		db.logger.Infof("No subjects found")
 	}
 
 	return subjects
@@ -415,13 +411,13 @@ func (db *DB) UpdateNodeStatus(nodeID int, status NodeState) error {
 	var selectedConfiguration SelectedConfiguration
 	result := db.conn.Where("node_id = ?", nodeID).First(&selectedConfiguration)
 	if result.Error != nil {
-		logger.Errorf("Failed to find selected configuration for update: %v", result.Error)
+		db.logger.Errorf("Failed to find selected configuration for update: %v", result.Error)
 		return result.Error
 	}
 
 	result = db.conn.Model(&selectedConfiguration).Update("node_state", status)
 	if result.Error != nil {
-		logger.Errorf("Failed to update selected configuration: %v", result.Error)
+		db.logger.Errorf("Failed to update selected configuration: %v", result.Error)
 		return result.Error
 	}
 

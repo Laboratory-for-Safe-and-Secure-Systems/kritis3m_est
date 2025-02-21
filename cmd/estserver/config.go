@@ -10,12 +10,12 @@ import (
 type config struct {
 	RealCA              *realCAConfig `json:"ca,omitempty"`
 	TLS                 *tlsConfig    `json:"tls,omitempty"`
-	ASLConfig           *aslConfig    `json:"asl_config,omitempty"`
 	AllowedHosts        []string      `json:"allowed_hosts,omitempty"`
 	HealthCheckPassword string        `json:"healthcheck_password"`
 	RateLimit           int           `json:"rate_limit"`
 	Timeout             int           `json:"timeout"`
 	Logfile             string        `json:"log_file"`
+	LogLevel            int           `json:"log_level"`
 }
 
 type PKCS11Module struct {
@@ -47,12 +47,6 @@ type aslEndpointConfig struct {
 	Ciphersuites         []string `json:"ciphersuites,omitempty"`
 	ASLKeyExchangeMethod int      `json:"key_exchange_method,omitempty"`
 	KeylogFile           string   `json:"keylog_file,omitempty"`
-}
-
-// aslConfig contains the configuration for the ASL library.
-type aslConfig struct {
-	LoggingEnabled bool `json:"logging_enabled"`
-	LogLevel       int  `json:"log_level"`
 }
 
 // configFromFile returns a new EST server configuration from a JSON-encoded
@@ -102,10 +96,6 @@ const sample = `{
             "pin": "1234"
         }
     },
-    "asl_config": {
-        "logging_enabled": true,
-        "log_level": 3,
-    },
     "allowed_hosts": [
         "localhost",
         "127.0.0.1",
@@ -114,7 +104,8 @@ const sample = `{
     "healthcheck_password": "xyzzy",
     "rate_limit": 150,
     "timeout": 30,
-    "log_file": "/path/to/log.file"
+    "log_file": "/path/to/log.file",
+    "log_level": 3
 }`
 
 // sampleConfig outputs a sample configuration file.

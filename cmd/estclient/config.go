@@ -349,7 +349,7 @@ func (k *privateKey) UnmarshalJSON(b []byte) error {
 
 // newConfig returns a configuration object from a file.
 func newConfig(set *flag.FlagSet) (config, error) {
-	loglevel := int32(2)
+	loglevel := int32(kritis3m_pki.KRITIS3M_PKI_LOG_LEVEL_WRN)
 	var cfg = config{
 		flagSet:   set,
 		flags:     make(map[string]string),

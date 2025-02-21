@@ -105,6 +105,8 @@ func init() {
 				usernameFlag,
 				timeoutFlag,
 				pkcs11libFlag,
+				verboseFlag,
+				debugFlag,
 			},
 			usageExtras: []func(io.Writer, int){
 				usageCommon,

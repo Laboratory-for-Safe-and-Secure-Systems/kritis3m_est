@@ -37,7 +37,7 @@ type keyValue struct {
 }
 
 // New creates a new zerolog-based logger which writes to the specified writer.
-func New(w io.Writer) est.Logger {
+func New(w io.Writer, level zerolog.Level) est.Logger {
 	// Use zerolog.ConsoleWriter for human-readable output with colors
 	consoleWriter := zerolog.ConsoleWriter{
 		Out:        w,
@@ -49,7 +49,7 @@ func New(w io.Writer) est.Logger {
 	logger := zerolog.New(consoleWriter).With().Timestamp().Logger()
 
 	// Set the global level to debug to include all log levels
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	zerolog.SetGlobalLevel(level)
 
 	return &Logger{
 		logger: logger,
