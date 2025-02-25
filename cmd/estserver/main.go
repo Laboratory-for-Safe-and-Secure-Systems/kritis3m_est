@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
+	aslListener "github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/listener"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
@@ -210,7 +211,7 @@ func main() {
 			Addr:    listenAddr,
 			Handler: r,
 			ConnContext: func(ctx context.Context, c net.Conn) context.Context {
-				if aslConn, ok := c.(*aslhttpserver.ASLConn); ok {
+				if aslConn, ok := c.(*aslListener.ASLConn); ok {
 					if aslConn.TLSState != nil {
 						// Attach the TLS state to the context
 						return context.WithValue(ctx, aslhttpserver.TLSStateKey, aslConn.TLSState)
