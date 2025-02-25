@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"mime/multipart"
 	"net"
@@ -31,7 +32,8 @@ import (
 	"time"
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpclient"
+	aslClient "github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/listener"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/logging"
 )
 
 // Client is an EST client implementing the Enrollment over Secure Transport
@@ -263,7 +265,7 @@ func (c *Client) ServerKeyGen(ctx context.Context, r *x509.CertificateRequest) (
 		// body.
 		if ce := part.Header.Get(transferEncodingHeader); ce == "" {
 			return nil, nil, fmt.Errorf("missing %s header", transferEncodingHeader)
-		} else if strings.ToUpper(ce) != strings.ToUpper(encodingTypeBase64) {
+		} else if !strings.EqualFold(ce, encodingTypeBase64) {
 			return nil, nil, fmt.Errorf("unexpected %s: %s", transferEncodingHeader, ce)
 		}
 
@@ -508,7 +510,7 @@ func checkResponseError(r *http.Response) error {
 		retryAfter, err = strconv.Atoi(secs)
 		if err != nil {
 			if t, err := parseHTTPTime(secs); err == nil {
-				retryAfter = int(t.Sub(time.Now()).Seconds())
+				retryAfter = int(time.Until(t).Seconds())
 			}
 		}
 
@@ -572,9 +574,10 @@ func (c *Client) makeHTTPClient() *http.Client {
 	endpoint := asl.ASLsetupClientEndpoint(config)
 
 	// Create the custom ASL transport
-	aslTransport := &aslhttpclient.ASLTransport{
+	aslTransport := &aslClient.ASLTransport{
 		Endpoint: endpoint,
-		Dialer:   &net.Dialer{Timeout: 30 * time.Second}, // Use custom dialer if needed
+		Dialer:   &net.Dialer{Timeout: 30 * time.Second},
+		Logger:   logging.NewLogger(log.Default()),
 	}
 
 	return &http.Client{
