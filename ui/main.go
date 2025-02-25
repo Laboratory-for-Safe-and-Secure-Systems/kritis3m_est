@@ -19,6 +19,7 @@ import (
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/db"
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/rs/zerolog"
 )
 
 type CONFIG_TYPE int
@@ -28,7 +29,7 @@ const (
 	HYBRID  CONFIG_TYPE = 2
 )
 
-var logger = alogger.New(os.Stderr)
+var logger = alogger.New(os.Stderr, zerolog.DebugLevel)
 
 // WebSocket upgrader to upgrade HTTP connections to WebSocket connections
 var upgrader = websocket.Upgrader{
@@ -112,9 +113,9 @@ func generateDynamicTemplate(data interface{}, excludeFields []string) (string, 
 				t := fieldValue.Interface().(time.Time)
 				// if no time is set, display "Not Seen"
 				if t.IsZero() {
-					row = append(row, fmt.Sprintf("<td class=\"text-center p-3 text-gray-500\"></td>"))
+					row = append(row, `<td class="text-center p-3 text-gray-500"></td>`)
 				} else {
-					row = append(row, fmt.Sprintf("<td class=\"text-center p-3 text-gray-500\">%s</td>", t.Format("2006-01-02 15:04:05")))
+					row = append(row, fmt.Sprintf(`<td class="text-center p-3 text-gray-500">%s</td>`, t.Format("2006-01-02 15:04:05")))
 				}
 				// if fieldValue is a contains "Status" and is of type string then do a traffic light style
 			} else if strings.Contains(field.Name, "Status") {
@@ -199,8 +200,18 @@ func contains(slice []string, item string) bool {
 // handleNodeData handles the HTMX request and returns the formatted data
 func handleNodeData(w http.ResponseWriter, _ *http.Request, newDB *db.DB) {
 	nodes, err := newDB.GetNodes()
+	if err != nil {
+		http.Error(w, "Error getting nodes", http.StatusInternalServerError)
+		logger.Errorf("Failed to get nodes: %v", err)
+		return
+	}
 
 	tmpl, err := generateDynamicTemplate(nodes, []string{"Model", "ID"})
+	if err != nil {
+		http.Error(w, "Error rendering template", http.StatusInternalServerError)
+		logger.Errorf("Failed to generate dynamic template: %v", err)
+		return
+	}
 
 	t, err := template.New("tableRows").Parse(tmpl)
 	if err != nil {
@@ -222,6 +233,11 @@ func handleData(w http.ResponseWriter, _ *http.Request, newDB *db.DB) {
 	certs := newDB.GetCertificates()
 
 	tmpl, err := generateDynamicTemplate(certs, []string{"Model"})
+	if err != nil {
+		http.Error(w, "Error rendering template", http.StatusInternalServerError)
+		logger.Errorf("Failed to generate dynamic template: %v", err)
+		return
+	}
 
 	t, err := template.New("tableRows").Parse(tmpl)
 	if err != nil {
@@ -274,8 +290,13 @@ func main() {
 	}
 
 	// Connect to the databases
-	certDB, err := db.NewDB("sqlite", *certDBFile)
-	nodesDB, err := db.NewDB("sqlite", *nodesDBFile)
+	certDB, err := db.NewDB("sqlite", *certDBFile, logger)
+	if err != nil {
+		logger.Errorf("Failed to connect to database: %v", err)
+		os.Exit(1)
+	}
+	defer certDB.Close()
+	nodesDB, err := db.NewDB("sqlite", *nodesDBFile, logger)
 	if err != nil {
 		logger.Errorf("Failed to connect to database: %v", err)
 	}
@@ -411,7 +432,7 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		if response.StatusCode != http.StatusOK {
 			w.WriteHeader(http.StatusInternalServerError)
-      w.Write(responseBody)
+			w.Write(responseBody)
 		} else {
 			w.WriteHeader(http.StatusOK)
 			w.Write(responseBody)
