@@ -10,17 +10,16 @@ import (
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 	aslListener "github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/listener"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/logging"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
 )
 
 // ASLServer struct that embeds http.Server and uses custom ASL TLS listener
 type ASLServer struct {
 	*http.Server
 	ASLTLSEndpoint *asl.ASLEndpoint // Custom ASL Endpoint configuration
+	Logger         common.Logger
+	DebugLog       bool
 }
-
-type contextKey string
-
-const TLSStateKey contextKey = "tlsState"
 
 // Constructor for ASLServer
 func NewASLServer(addr string, handler http.Handler, endpointConfig *asl.EndpointConfig) *ASLServer {
@@ -33,7 +32,7 @@ func NewASLServer(addr string, handler http.Handler, endpointConfig *asl.Endpoin
 	// Set the ConnContext function
 	srv.ConnContext = func(ctx context.Context, c net.Conn) context.Context {
 		if aslConn, ok := c.(*aslListener.ASLConn); ok {
-			ctx = context.WithValue(ctx, TLSStateKey, aslConn.TLSState)
+			ctx = context.WithValue(ctx, common.TLSStateKey, aslConn.TLSState)
 		}
 		return ctx
 	}
@@ -70,8 +69,8 @@ func (srv *ASLServer) ListenAndServeASLTLS() error {
 	aslListener := &aslListener.ASLListener{
 		Endpoint: srv.ASLTLSEndpoint,
 		Listener: tcpListener,
-		Logger:   logging.NewLogger(log.Default()),
-		Debug:    true,
+		Logger:   logging.NewLogger(srv.Logger),
+		Debug:    srv.DebugLog,
 	}
 
 	log.Printf("\033[1;32mStarting ASL server on %s\033[0m", address)

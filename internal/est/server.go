@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.mozilla.org/pkcs7"
@@ -30,7 +30,7 @@ type ServerConfig struct {
 
 	// Logger is an optional logger. The logger can be retrieved by the backing
 	// CA from the HTTP request context using LoggerFromContext.
-	Logger Logger
+	Logger common.Logger
 
 	// Timeout sets a request timeout. If zero, a reasonable default will be
 	// used.
@@ -86,8 +86,8 @@ const (
 )
 
 // LoggerFromContext returns a logger included in a context.
-func LoggerFromContext(ctx context.Context) Logger {
-	logger, _ := ctx.Value(ctxKeyLogger).(Logger)
+func LoggerFromContext(ctx context.Context) common.Logger {
+	logger, _ := ctx.Value(ctxKeyLogger).(common.Logger)
 	return logger
 }
 
@@ -120,7 +120,7 @@ func NewRouter(cfg *ServerConfig) (http.Handler, error) {
 		timeout = cfg.Timeout
 	}
 
-	var logger Logger
+	var logger common.Logger
 	if cfg.Logger != nil {
 		logger = cfg.Logger
 	} else {
@@ -454,7 +454,7 @@ func writeOnError(ctx context.Context, w http.ResponseWriter, msg string, err er
 func tlsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.TLS == nil {
-			tlsState, ok := r.Context().Value(aslhttpserver.TLSStateKey).(*tls.ConnectionState)
+			tlsState, ok := r.Context().Value(common.TLSStateKey).(*tls.ConnectionState)
 			if ok {
 				r.TLS = tlsState
 			}
@@ -464,7 +464,7 @@ func tlsMiddleware(next http.Handler) http.Handler {
 }
 
 // withLogger is middleware that logs each HTTP request.
-func withLogger(logger Logger) func(next http.Handler) http.Handler {
+func withLogger(logger common.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 
@@ -508,7 +508,7 @@ func withLogger(logger Logger) func(next http.Handler) http.Handler {
 }
 
 // recoverer is middleware which recovers from a panic and logs a stack trace.
-func recoverer(logger Logger) func(next http.Handler) http.Handler {
+func recoverer(logger common.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 

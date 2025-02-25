@@ -16,6 +16,7 @@ import (
 	aslListener "github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/listener"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
@@ -214,13 +215,15 @@ func main() {
 				if aslConn, ok := c.(*aslListener.ASLConn); ok {
 					if aslConn.TLSState != nil {
 						// Attach the TLS state to the context
-						return context.WithValue(ctx, aslhttpserver.TLSStateKey, aslConn.TLSState)
+						return context.WithValue(ctx, common.TLSStateKey, aslConn.TLSState)
 					}
 				}
 				return ctx
 			},
 		},
 		ASLTLSEndpoint: endpoint,
+		Logger:         logger,
+		DebugLog:       cfg.LogLevel == 4,
 	}
 
 	go func() {
