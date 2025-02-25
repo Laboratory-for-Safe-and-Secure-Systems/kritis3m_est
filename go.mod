@@ -1,6 +1,8 @@
 module github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est
 
-go 1.23
+go 1.23.0
+
+toolchain go1.24.0
 
 require (
 	github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.1.7

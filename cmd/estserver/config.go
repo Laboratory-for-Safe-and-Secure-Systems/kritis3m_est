@@ -28,6 +28,7 @@ type PKCS11Module struct {
 type realCAConfig struct {
 	Certs        string        `json:"certificates"`
 	Key          string        `json:"private_key"`
+	Validity     int           `json:"validity,omitempty"`
 	IssuerModule *PKCS11Module `json:"pkcs11_module,omitempty"`
 }
 
@@ -69,6 +70,7 @@ const sample = `{
     "ca": {
         "certificates": "/path/to/CA/certificates.pem",
         "private_key": "/path/to/CA/private/key.pem",
+	"validity": 365,
         "pkcs11_module": {
             "path": "/usr/lib/softhsm/libsofthsm2.so",
             "slot": 0,

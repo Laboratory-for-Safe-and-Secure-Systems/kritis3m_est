@@ -58,13 +58,14 @@ type RealCA struct {
 	kritis3m_pki *kritis3m_pki.KRITIS3MPKI
 	database     *db.DB
 	logger       est.Logger
+	validity     int
 }
 
 // New creates a new mock certificate authority. If more than one CA certificate
 // is provided, they should be in order with the issuing (intermediate) CA
 // certificate first, and the root CA certificate last. The private key should
 // be associated with the public key in the first, issuing CA certificate.
-func New(cacerts []*x509.Certificate, key interface{}, logger est.Logger) (*RealCA, error) {
+func New(cacerts []*x509.Certificate, key interface{}, logger est.Logger, validity int) (*RealCA, error) {
 	if len(cacerts) < 1 {
 		return nil, errors.New("no CA certificates provided")
 	} else if key == nil {
@@ -89,11 +90,12 @@ func New(cacerts []*x509.Certificate, key interface{}, logger est.Logger) (*Real
 		kritis3m_pki: kritis3m_pki.Kritis3mPKI,
 		database:     database,
 		logger:       logger,
+		validity:     validity,
 	}, nil
 }
 
 // Load CA certificates and key from PEM files. // Optionally, load PKCS#11
-func Load(certFile string, keyFile string, logger est.Logger, pkcs11Config kritis3m_pki.PKCS11Config) (*RealCA, error) {
+func Load(certFile string, keyFile string, logger est.Logger, pkcs11Config kritis3m_pki.PKCS11Config, validity int) (*RealCA, error) {
 	certData, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read certificate file: %w", err)
@@ -122,7 +124,7 @@ func Load(certFile string, keyFile string, logger est.Logger, pkcs11Config kriti
 
 	logger.Infof("Loaded CA certificates and key from %s and %s", certFile, keyFile)
 
-	return New(certs, keyData, logger)
+	return New(certs, keyData, logger, validity)
 }
 
 func parseCertificates(certData []byte) ([]*x509.Certificate, error) {
@@ -244,7 +246,7 @@ func (ca *RealCA) Enroll(
 	}
 
 	// Create certificate using aslPKI
-	err := kritis3m_pki.Kritis3mPKI.CreateCertificate(csr.Raw, int(defaultCertificateDuration), false)
+	err := kritis3m_pki.Kritis3mPKI.CreateCertificate(csr.Raw, ca.validity, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}

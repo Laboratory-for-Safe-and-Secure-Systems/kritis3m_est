@@ -175,10 +175,16 @@ func main() {
 		defer f.Close()
 	}
 
+	// Set default validity if not specified.
+	if cfg.RealCA.Validity == 0 {
+		logger.Infof("No validity specified in configuration file, using default value of 365 days")
+		cfg.RealCA.Validity = 365
+	}
+
 	// Create CA.
 	var ca *realca.RealCA
 	if cfg.RealCA != nil {
-		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key, logger, pkcs11Config)
+		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key, logger, pkcs11Config, cfg.RealCA.Validity)
 		if err != nil {
 			log.Fatalf("failed to create CA: %v", err)
 		}
