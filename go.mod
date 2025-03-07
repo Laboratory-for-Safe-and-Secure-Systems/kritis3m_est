@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.0
 
 require (
-	github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.1.7
+	github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.1.8
 	github.com/ThalesIgnite/crypto11 v1.2.5
 	github.com/globalsign/pemfile v1.0.0
 	github.com/go-chi/chi/v5 v5.2.1
@@ -14,7 +14,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/rs/zerolog v1.33.0
 	go.mozilla.org/pkcs7 v0.9.0
-	golang.org/x/term v0.29.0
+	golang.org/x/term v0.30.0
 	golang.org/x/time v0.11.0
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/driver/sqlite v1.5.7
@@ -33,8 +33,8 @@ require (
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
-	golang.org/x/crypto v0.35.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 )
