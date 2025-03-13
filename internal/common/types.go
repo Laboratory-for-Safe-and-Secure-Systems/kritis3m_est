@@ -25,6 +25,27 @@ type Logger interface {
 
 	// With adds a variadic number of key-values pairs to the logging context.
 	With(keysAndValues ...interface{}) Logger
+
+	// Info returns a logger with info level
+	Info() LogEvent
+
+	// Fatal returns a logger with fatal level
+	Fatal() LogEvent
+}
+
+// LogEvent is an interface for logging events
+type LogEvent interface {
+	// Msg logs a message
+	Msg(msg string)
+
+	// Msgf logs a formatted message
+	Msgf(format string, args ...interface{})
+
+	// Err adds an error to the log event
+	Err(err error) LogEvent
+
+	// Str adds a string field to the log event
+	Str(key, val string) LogEvent
 }
 
 type ContextKey string

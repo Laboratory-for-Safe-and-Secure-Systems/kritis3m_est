@@ -24,6 +24,9 @@ type Logger = common.Logger
 // provided to the EST server.
 type nopLogger struct{}
 
+// nopLogEvent is a do-nothing log event.
+type nopLogEvent struct{}
+
 func (l *nopLogger) Errorf(format string, args ...interface{}) {}
 
 func (l *nopLogger) Errorw(msg string, keysAndValues ...interface{}) {}
@@ -38,6 +41,32 @@ func (l *nopLogger) Debugw(msg string, keysAndValues ...interface{}) {}
 
 func (l *nopLogger) With(keysAndValues ...interface{}) common.Logger {
 	return l
+}
+
+// Info returns a new no-op log event
+func (l *nopLogger) Info() common.LogEvent {
+	return &nopLogEvent{}
+}
+
+// Fatal returns a new no-op log event
+func (l *nopLogger) Fatal() common.LogEvent {
+	return &nopLogEvent{}
+}
+
+// Msg implements the LogEvent interface
+func (e *nopLogEvent) Msg(msg string) {}
+
+// Msgf implements the LogEvent interface
+func (e *nopLogEvent) Msgf(format string, args ...interface{}) {}
+
+// Err implements the LogEvent interface
+func (e *nopLogEvent) Err(err error) common.LogEvent {
+	return e
+}
+
+// Str implements the LogEvent interface
+func (e *nopLogEvent) Str(key, val string) common.LogEvent {
+	return e
 }
 
 func newNOPLogger() common.Logger {

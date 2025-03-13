@@ -15,6 +15,14 @@ const (
 	reenrollEndpoint     = "/simplereenroll"
 	serverkeygenEndpoint = "/serverkeygen"
 	tpmenrollEndpoint    = "/tpmenroll"
+
+	// BRSKI endpoints
+	brskiPrefix                    = "/.well-known/brski"
+	requestVoucherEndpoint         = "/requestvoucher"
+	voucherStatusEndpoint          = "/voucher_status"
+	registrarVoucherEndpoint       = "/registrar/voucher"
+	registrarVoucherStatusEndpoint = "/registrar/voucher_status"
+	requestAuditLogEndpoint        = "/requestauditlog"
 )
 
 // HTTP header and MIME type constants.
