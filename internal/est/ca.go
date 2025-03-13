@@ -10,12 +10,12 @@ import (
 // connected to any backing CA by providing an implementation of this interface.
 //
 // All operations receive:
-// - a context, from which the EST server logger can be retrieved by calling
-//   LoggerFromContext
-// - the optional URI additional path segment (RFC7030 3.2.2)
-// - the HTTP request object from the server, from which the HTTP headers
-//   passed by the client (including the Host header, to support virtual
-//   servers) can be obtained
+//   - a context, from which the EST server logger can be retrieved by calling
+//     LoggerFromContext
+//   - the optional URI additional path segment (RFC7030 3.2.2)
+//   - the HTTP request object from the server, from which the HTTP headers
+//     passed by the client (including the Host header, to support virtual
+//     servers) can be obtained
 //
 // Any error object returned from these functions which implements Error will be
 // used by the EST server to determine the HTTP response code, human-readable
@@ -43,8 +43,29 @@ type CA interface {
 	// RFC7030 4.4.
 	ServerKeyGen(ctx context.Context, csr *x509.CertificateRequest, aps string, r *http.Request) (*x509.Certificate, []byte, error)
 
-  // Revokation List
-  RevocationList(ctx context.Context, r *http.Request) ([]byte, error)
+	// Revokation List
+	RevocationList(ctx context.Context, r *http.Request) ([]byte, error)
+}
+
+// BRSKIRegistrar extends the CA interface with BRSKI registrar functionality.
+// If a CA implementation supports BRSKI, it should also implement this interface.
+// See RFC 8995 for details.
+type BRSKIRegistrar interface {
+	// ProcessVoucherRequest processes a voucher request from a pledge and returns a voucher.
+	// The request and response are in PKCS7 format as defined in RFC 8995.
+	ProcessVoucherRequest(ctx context.Context, voucherRequest []byte, aps string, r *http.Request) ([]byte, error)
+
+	// ProcessVoucherStatus processes a voucher status update from a pledge.
+	ProcessVoucherStatus(ctx context.Context, serialNumber string, status []byte, aps string, r *http.Request) error
+
+	// GetVoucher retrieves a cached voucher for a device.
+	GetVoucher(ctx context.Context, serialNumber string, aps string, r *http.Request) ([]byte, error)
+
+	// GetVoucherStatus retrieves the status of a voucher.
+	GetVoucherStatus(ctx context.Context, serialNumber string, aps string, r *http.Request) ([]byte, error)
+
+	// GetAuditLog retrieves the audit log for a device from the MASA.
+	GetAuditLog(ctx context.Context, serialNumber string, aps string, r *http.Request) ([]byte, error)
 }
 
 // Error represents an error which can be translated into an HTTP
