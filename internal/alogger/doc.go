@@ -13,8 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Package basiclogger provides a basic logger implementing est.Logger, for
-demonstration and testing purposes.
-*/
+// Package alogger provides a logger implementing common.Logger interface
+// for use with EST and BRSKI components. It is based on zerolog for high
+// performance logging.
 package alogger

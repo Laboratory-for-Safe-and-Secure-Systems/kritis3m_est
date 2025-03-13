@@ -6,93 +6,92 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
-	"gorm.io/gorm/logger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
+	gormlogger "gorm.io/gorm/logger"
 	"gorm.io/gorm/utils"
 )
 
-// GormLogger wraps the Logger to implement GORM's logger.Interface
+// GormLogger implements the gorm.io/gorm/logger.Interface
 type GormLogger struct {
-	logger                    est.Logger
-	logLevel                  logger.LogLevel
-	slowThreshold             time.Duration
-	ignoreRecordNotFoundError bool
+	LogLevel                  gormlogger.LogLevel
+	SlowThreshold             time.Duration
+	IgnoreRecordNotFoundError bool
+	Logger                    common.Logger
 }
 
-// NewGormLogger creates a new GormLogger using the provided est.Logger
-func NewGormLogger(estLogger est.Logger) *GormLogger {
+// NewGormLogger creates a new GormLogger using the provided common.Logger
+func NewGormLogger(logger common.Logger) *GormLogger {
 	return &GormLogger{
-		logger:                    estLogger,
-		logLevel:                  logger.Warn,
-		slowThreshold:             200 * time.Millisecond,
-		ignoreRecordNotFoundError: true,
+		LogLevel:                  gormlogger.Warn,
+		SlowThreshold:             time.Second,
+		IgnoreRecordNotFoundError: true,
+		Logger:                    logger,
 	}
 }
 
-func (gl *GormLogger) LogMode(level logger.LogLevel) logger.Interface {
+// LogMode sets the log level and returns a new logger instance
+func (gl *GormLogger) LogMode(level gormlogger.LogLevel) gormlogger.Interface {
 	newLogger := *gl
-	newLogger.logLevel = level
+	newLogger.LogLevel = level
 	return &newLogger
 }
 
+// Info logs info messages
 func (gl *GormLogger) Info(ctx context.Context, msg string, args ...interface{}) {
-	if gl.logLevel < logger.Info {
+	if gl.LogLevel < gormlogger.Info {
 		return
 	}
-	gl.logger.Infof(msg, args...)
+	gl.Logger.Infof(msg, args...)
 }
 
+// Warn logs warning messages
 func (gl *GormLogger) Warn(ctx context.Context, msg string, args ...interface{}) {
-	if gl.logLevel < logger.Warn {
+	if gl.LogLevel < gormlogger.Warn {
 		return
 	}
-	gl.logger.Infof(msg, args...)
+	gl.Logger.Infof("WARNING: "+msg, args...) // Using Info level since Logger may not have Warn
 }
 
+// Error logs error messages
 func (gl *GormLogger) Error(ctx context.Context, msg string, args ...interface{}) {
-	if gl.logLevel < logger.Error {
+	if gl.LogLevel < gormlogger.Error {
 		return
 	}
-	gl.logger.Errorf(msg, args...)
+	gl.Logger.Errorf(msg, args...)
 }
 
+// Trace logs database operations
 func (gl *GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
-	if gl.logLevel <= logger.Silent {
+	if gl.LogLevel <= gormlogger.Silent {
 		return
 	}
 
 	elapsed := time.Since(begin)
 	sql, rows := fc()
+	sqlWithRows := fmt.Sprintf("[rows:%v] %s", rows, sql)
 
 	switch {
-	case err != nil && (!errors.Is(err, logger.ErrRecordNotFound) || !gl.ignoreRecordNotFoundError):
-		if gl.logLevel >= logger.Error {
-			gl.logger.Errorw("database error",
-				"err", err,
+	case err != nil && (!errors.Is(err, gormlogger.ErrRecordNotFound) || !gl.IgnoreRecordNotFoundError):
+		if gl.LogLevel >= gormlogger.Error {
+			gl.Logger.Errorw("database error",
+				"error", err,
 				"elapsed", elapsed,
-				"rows", rows,
-				"sql", sql,
-				"file", utils.FileWithLineNum(),
+				"sql", sqlWithRows,
+				"caller", utils.FileWithLineNum(),
 			)
 		}
-	case elapsed > gl.slowThreshold && gl.slowThreshold != 0:
-		if gl.logLevel >= logger.Warn {
-			slowLog := fmt.Sprintf("SLOW SQL >= %v", gl.slowThreshold)
-			gl.logger.Infow(slowLog,
+	case elapsed > gl.SlowThreshold && gl.SlowThreshold != 0:
+		if gl.LogLevel >= gormlogger.Warn {
+			slowLog := fmt.Sprintf("SLOW SQL >= %v", gl.SlowThreshold)
+			gl.Logger.Infow(slowLog,
 				"elapsed", elapsed,
-				"rows", rows,
-				"sql", sql,
-				"file", utils.FileWithLineNum(),
+				"sql", sqlWithRows,
+				"caller", utils.FileWithLineNum(),
 			)
 		}
 	default:
-		if gl.logLevel >= logger.Info {
-			gl.logger.Debugw("database query",
-				"elapsed", elapsed,
-				"rows", rows,
-				"sql", sql,
-				"file", utils.FileWithLineNum(),
-			)
+		if gl.LogLevel >= gormlogger.Info {
+			gl.Logger.Debugf("database query [%s] %s", elapsed, sqlWithRows)
 		}
 	}
 }

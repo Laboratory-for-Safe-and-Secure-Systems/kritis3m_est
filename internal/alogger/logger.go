@@ -20,11 +20,11 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
 	"github.com/rs/zerolog"
 )
 
-// Logger is a zerolog-based logger implementing est.Logger.
+// Logger is a zerolog-based logger implementing common.Logger interface.
 type Logger struct {
 	logger zerolog.Logger
 	fields []keyValue
@@ -36,8 +36,35 @@ type keyValue struct {
 	value interface{}
 }
 
+// LogEvent wraps a zerolog.Event to implement the common.LogEvent interface
+type LogEvent struct {
+	event *zerolog.Event
+}
+
+// Msg sends the event with the given message
+func (e *LogEvent) Msg(msg string) {
+	e.event.Msg(msg)
+}
+
+// Msgf sends the event with the formatted message
+func (e *LogEvent) Msgf(format string, args ...interface{}) {
+	e.event.Msgf(format, args...)
+}
+
+// Err adds the given error to the event
+func (e *LogEvent) Err(err error) common.LogEvent {
+	e.event.Err(err)
+	return e
+}
+
+// Str adds a string field to the event
+func (e *LogEvent) Str(key, val string) common.LogEvent {
+	e.event.Str(key, val)
+	return e
+}
+
 // New creates a new zerolog-based logger which writes to the specified writer.
-func New(w io.Writer, level zerolog.Level) est.Logger {
+func New(w io.Writer, level zerolog.Level) common.Logger {
 	// Use zerolog.ConsoleWriter for human-readable output with colors
 	consoleWriter := zerolog.ConsoleWriter{
 		Out:        w,
@@ -90,8 +117,14 @@ func (l *Logger) Errorw(msg string, keysAndValues ...interface{}) {
 	l.logw(zerolog.ErrorLevel, msg, keysAndValues...)
 }
 
-// Info uses fmt.Sprint to construct and log a message.
-func (l *Logger) Info(v ...interface{}) {
+// Info returns a logger with info level
+func (l *Logger) Info() common.LogEvent {
+	return &LogEvent{event: l.logger.Info()}
+}
+
+// InfoPrint uses fmt.Sprint to construct and log a message.
+// This replaces the old Info method to avoid conflicts
+func (l *Logger) InfoPrint(v ...interface{}) {
 	msg := fmt.Sprint(v...)
 	l.logw(zerolog.InfoLevel, msg)
 }
@@ -107,63 +140,116 @@ func (l *Logger) Infow(msg string, keysAndValues ...interface{}) {
 	l.logw(zerolog.InfoLevel, msg, keysAndValues...)
 }
 
-// With adds a variadic number of key-values pairs to the logging context. The
-// first element of the pair is used as the field key and should be a string.
-// Passing a non-string key or passing an orphaned key panics.
-func (l *Logger) With(args ...interface{}) est.Logger {
+// Fatal returns a logger with fatal level
+func (l *Logger) Fatal() common.LogEvent {
+	return &LogEvent{event: l.logger.Fatal()}
+}
+
+// With adds a variadic number of fields to the logging context.
+func (l *Logger) With(args ...interface{}) common.Logger {
+	// If the number of args is odd, the last field will be discarded.
+	// This is consistent with zerolog's behavior.
 	if len(args)%2 != 0 {
-		panic("number of arguments is not a multiple of 2")
+		args = args[:len(args)-1]
+	}
+
+	// Create a new logger with the same underlying logger but different fields.
+	newFields := make([]keyValue, len(l.fields), len(l.fields)+len(args)/2)
+	copy(newFields, l.fields)
+
+	// Add new fields
+	for i := 0; i < len(args); i += 2 {
+		key, ok := args[i].(string)
+		if !ok {
+			continue
+		}
+		newFields = append(newFields, keyValue{key: key, value: args[i+1]})
 	}
 
 	newLogger := &Logger{
 		logger: l.logger,
-		fields: l.fields,
-	}
-
-	for i := 0; i < len(args); i += 2 {
-		key, ok := args[i].(string)
-		if !ok {
-			panic(fmt.Sprintf("argument %d is not a string", i))
-		}
-
-		newLogger.fields = append(newLogger.fields, keyValue{key: key, value: args[i+1]})
+		fields: newFields,
 	}
 
 	return newLogger
 }
 
-// logw is the common implementation for all logging methods.
+// logw is the common logging implementation for various levels.
 func (l *Logger) logw(level zerolog.Level, msg string, keysAndValues ...interface{}) {
-	// Start a new event at the specified level
-	event := l.logger.WithLevel(level)
+	var event *zerolog.Event
 
-	// Get the caller information
-	_, file, line, ok := runtime.Caller(2) // Adjust skip level if needed
+	switch level {
+	case zerolog.DebugLevel:
+		event = l.logger.Debug()
+	case zerolog.InfoLevel:
+		event = l.logger.Info()
+	case zerolog.WarnLevel:
+		event = l.logger.Warn()
+	case zerolog.ErrorLevel:
+		event = l.logger.Error()
+	case zerolog.FatalLevel:
+		event = l.logger.Fatal()
+	case zerolog.PanicLevel:
+		event = l.logger.Panic()
+	default:
+		event = l.logger.Log()
+	}
+
+	// Add caller information
+	_, file, line, ok := runtime.Caller(2)
 	if ok {
-		shortFile := fmt.Sprintf("%s/%s:%d", filepath.Base(filepath.Dir(file)), filepath.Base(file), line)
-		// Add the caller info to the event
-		event = event.Str("caller", shortFile)
+		event = event.Str("caller", fmt.Sprintf("%s:%d", filepath.Base(file), line))
 	}
 
-	// Add the stored fields
-	for _, kv := range l.fields {
-		event = event.Interface(kv.key, kv.value)
+	// Add pre-existing fields
+	for _, field := range l.fields {
+		event = addField(event, field.key, field.value)
 	}
 
-	// Process keysAndValues
-	if len(keysAndValues)%2 != 0 {
-		panic("number of arguments is not a multiple of 2")
-	}
-
+	// Add the key-value pairs from this specific log entry
+	keysAndValues = cleanKeysAndValues(keysAndValues)
 	for i := 0; i < len(keysAndValues); i += 2 {
 		key, ok := keysAndValues[i].(string)
 		if !ok {
-			panic(fmt.Sprintf("argument %d is not a string", i))
+			continue
 		}
-		value := keysAndValues[i+1]
-		event = event.Interface(key, value)
+
+		if i+1 < len(keysAndValues) {
+			event = addField(event, key, keysAndValues[i+1])
+		}
 	}
 
-	// Log the message
 	event.Msg(msg)
+}
+
+// cleanKeysAndValues ensures that keysAndValues has an even length
+func cleanKeysAndValues(keysAndValues []interface{}) []interface{} {
+	if len(keysAndValues)%2 != 0 {
+		return keysAndValues[:len(keysAndValues)-1]
+	}
+	return keysAndValues
+}
+
+// addField adds a field to the zerolog.Event based on the value's type
+func addField(event *zerolog.Event, key string, value interface{}) *zerolog.Event {
+	if value == nil {
+		return event.Interface(key, nil)
+	}
+
+	switch v := value.(type) {
+	case string:
+		return event.Str(key, v)
+	case bool:
+		return event.Bool(key, v)
+	case int:
+		return event.Int(key, v)
+	case int64:
+		return event.Int64(key, v)
+	case float64:
+		return event.Float64(key, v)
+	case error:
+		return event.Err(v).Str(key, v.Error())
+	default:
+		return event.Interface(key, v)
+	}
 }
