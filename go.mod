@@ -11,7 +11,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/google/go-tpm v0.9.3
 	github.com/gorilla/websocket v1.5.3
-	github.com/mattn/go-sqlite3 v1.14.24
+	github.com/mattn/go-sqlite3 v1.14.27
 	github.com/rs/zerolog v1.34.0
 	go.mozilla.org/pkcs7 v0.9.0
 	golang.org/x/term v0.30.0
