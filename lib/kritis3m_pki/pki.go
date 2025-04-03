@@ -14,8 +14,8 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/est"
 	"github.com/rs/zerolog"
 )
 

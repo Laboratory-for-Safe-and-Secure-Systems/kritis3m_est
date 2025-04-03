@@ -14,12 +14,12 @@ import (
 
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 	aslListener "github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/listener"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/aslhttpserver"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/common"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/kritis3m_pki"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/realca"
 	"github.com/rs/zerolog"
 )
 

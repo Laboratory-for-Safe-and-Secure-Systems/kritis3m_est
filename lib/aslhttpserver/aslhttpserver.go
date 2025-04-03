@@ -10,7 +10,7 @@ import (
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
 	aslListener "github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/listener"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/logging"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/common"
 )
 
 // ASLServer struct that embeds http.Server and uses custom ASL TLS listener

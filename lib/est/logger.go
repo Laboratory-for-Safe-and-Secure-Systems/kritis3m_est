@@ -15,7 +15,7 @@ limitations under the License.
 
 package est
 
-import "github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
+import "github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/common"
 
 // Logger is an interface for an EST server logger.
 type Logger = common.Logger

@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/db"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/db"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/est"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/kritis3m_pki"
 	"go.mozilla.org/pkcs7"
 )
 
