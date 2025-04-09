@@ -1,0 +1,31 @@
+
+syntax = "proto3";
+package est;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/philslol/kritis3m_scalev2/gen/go/v1";
+
+
+
+message EnrollCallRequest{
+    string est_serial_number = 1;
+    string serial_number = 2;
+    string organization = 3;
+    google.protobuf.Timestamp issued_at = 4;
+    google.protobuf.Timestamp expires_at = 5;
+    string signature_algorithm = 6;
+}
+
+message EnrollCallResponse{
+    int32 retval=1;
+}
+
+service ControlPlane {
+    rpc EnrollCall(EnrollCallRequest) returns (EnrollCallResponse);
+}
+
+
+
+
+

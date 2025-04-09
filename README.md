@@ -37,6 +37,11 @@ go install github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/cmd/es
 
 ## Usage
 
+# PROTO
+The protofile inherits from kritis3m_scale proto/est.proto. Keep ./proto/est.proto in sync with it
+
+
+
 ### Server
 
 Best is to create a configuration file for the server. An example configuration
@@ -111,3 +116,4 @@ estclient enroll \
     -cert <path-to-client-cert> \
     -key <path-to-client-key>
 ```
+
