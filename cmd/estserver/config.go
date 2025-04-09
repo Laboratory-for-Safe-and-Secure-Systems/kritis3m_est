@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
 )
 
 // config contains the EST server configuration.
@@ -26,10 +28,9 @@ type PKCS11Module struct {
 
 // RealCAConfig contains the real CA configuration.
 type realCAConfig struct {
-	Certs        string        `json:"certificates"`
-	Key          string        `json:"private_key"`
-	Validity     int           `json:"validity,omitempty"`
-	IssuerModule *PKCS11Module `json:"pkcs11_module,omitempty"`
+	Backends       []realca.PKIBackendConfig `json:"backends"`
+	DefaultBackend *realca.PKIBackendConfig  `json:"default_backend,omitempty"`
+	Validity       int                       `json:"validity,omitempty"`
 }
 
 // tlsConfig contains the server's TLS configuration.
@@ -68,14 +69,38 @@ func configFromFile(filename string) (*config, error) {
 
 const sample = `{
     "ca": {
-        "certificates": "/path/to/CA/certificates.pem",
-        "private_key": "/path/to/CA/private/key.pem",
-	"validity": 365,
-        "pkcs11_module": {
-            "path": "/usr/lib/softhsm/libsofthsm2.so",
-            "slot": 0,
-            "pin": "1234"
-        }
+        "backends": [
+            {
+                "aps": "dataplane",
+                "certificates": "/path/to/dataplane/certificates.pem",
+                "private_key": "/path/to/dataplane/private/key.pem",
+                "pkcs11_module": {
+                    "path": "/usr/lib/softhsm/libsofthsm2.so",
+                    "slot": 0,
+                    "pin": "1234"
+                }
+            },
+            {
+                "aps": "controlplane",
+                "certificates": "/path/to/controlplane/certificates.pem",
+                "private_key": "/path/to/controlplane/private/key.pem",
+                "pkcs11_module": {
+                    "path": "/usr/lib/softhsm/libsofthsm2.so",
+                    "slot": 1,
+                    "pin": "5678"
+                }
+            }
+        ],
+        "default_backend": {
+            "certificates": "/path/to/default/certificates.pem",
+            "private_key": "/path/to/default/private/key.pem",
+            "pkcs11_module": {
+                "path": "/usr/lib/softhsm/libsofthsm2.so",
+                "slot": 2,
+                "pin": "9012"
+            }
+        },
+        "validity": 365
     },
     "tls": {
         "listen_address": "localhost:8443",

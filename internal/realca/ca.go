@@ -3,6 +3,7 @@ package realca
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
@@ -41,41 +42,68 @@ const (
 	triggerErrorsAPS           = "triggererrors"
 )
 
-const (
-	pkcs8PrivateKeyPEMType = "PRIVATE KEY"
-	pkcs1PrivateKeyPEMType = "RSA PRIVATE KEY"
-	ecPrivateKeyPEMType    = "EC PRIVATE KEY"
-	pkixPublicKeyPEMType   = "PUBLIC KEY"
-	pkcs1PublicKeyPEMType  = "RSA PUBLIC KEY"
-)
+// PKIBackendConfig represents the configuration for a PKI backend
+type PKIBackendConfig struct {
+	APS          string                     `json:"aps"`
+	Module       *kritis3m_pki.PKCS11Module `json:"pkcs11_module,omitempty"`
+	Certificates string                     `json:"certificates"`
+	PrivateKey   string                     `json:"private_key"`
+}
 
 // RealCA is a simple CA implementation that uses a single key pair and
 // certificate to sign requests.
 // It uses Root 1 Intermediate 2 Entity hierarchy.
 type RealCA struct {
-	certs        []*x509.Certificate
-	key          interface{}
-	kritis3m_pki *kritis3m_pki.KRITIS3MPKI
-	database     *db.DB
-	logger       est.Logger
-	validity     int
+	backends       map[string]*kritis3m_pki.KRITIS3MPKI
+	defaultBackend *kritis3m_pki.KRITIS3MPKI
+	database       *db.DB
+	logger         est.Logger
+	validity       int
+	backendCerts   map[string][]*x509.Certificate
+	backendKeys    map[string]any
 }
 
 // New creates a new mock certificate authority. If more than one CA certificate
 // is provided, they should be in order with the issuing (intermediate) CA
 // certificate first, and the root CA certificate last. The private key should
 // be associated with the public key in the first, issuing CA certificate.
-func New(cacerts []*x509.Certificate, key interface{}, logger est.Logger, validity int) (*RealCA, error) {
-	if len(cacerts) < 1 {
-		return nil, errors.New("no CA certificates provided")
-	} else if key == nil {
-		return nil, errors.New("no private key provided")
+func New(backends []PKIBackendConfig, defaultBackend *PKIBackendConfig, logger est.Logger, validity int) (*RealCA, error) {
+	if len(backends) == 0 && defaultBackend == nil {
+		return nil, errors.New("no CA backends provided")
 	}
 
-	for i := range cacerts {
-		if !cacerts[i].IsCA {
-			return nil, fmt.Errorf("certificate at index %d is not a CA certificate", i)
+	ca := &RealCA{
+		backends:     make(map[string]*kritis3m_pki.KRITIS3MPKI),
+		backendCerts: make(map[string][]*x509.Certificate),
+		backendKeys:  make(map[string]any),
+		logger:       logger,
+		validity:     validity,
+	}
+
+	// Initialize default backend if provided
+	if defaultBackend != nil {
+		defaultPKI, certs, key, err := initializeBackend(defaultBackend)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize default backend: %w", err)
 		}
+		ca.defaultBackend = defaultPKI
+		ca.backendCerts["default"] = certs
+		ca.backendKeys["default"] = key
+	}
+
+	// Initialize APS-specific backends
+	for _, backend := range backends {
+		if backend.APS == "" {
+			return nil, errors.New("backend APS cannot be empty")
+		}
+
+		pki, certs, key, err := initializeBackend(&backend)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize backend for APS %s: %w", backend.APS, err)
+		}
+		ca.backends[backend.APS] = pki
+		ca.backendCerts[backend.APS] = certs
+		ca.backendKeys[backend.APS] = key
 	}
 
 	database, err := db.NewDB("sqlite", "test.db", logger)
@@ -83,72 +111,63 @@ func New(cacerts []*x509.Certificate, key interface{}, logger est.Logger, validi
 		return nil, fmt.Errorf("failed to connect to sqlite database: %w", err)
 	}
 	logger.Infof("Successfully connected to SQLite!")
+	ca.database = database
 
-	return &RealCA{
-		certs:        cacerts,
-		key:          key,
-		kritis3m_pki: kritis3m_pki.Kritis3mPKI,
-		database:     database,
-		logger:       logger,
-		validity:     validity,
-	}, nil
+	return ca, nil
 }
 
-// Load CA certificates and key from PEM files. // Optionally, load PKCS#11
-func Load(certFile string, keyFile string, logger est.Logger, pkcs11Config kritis3m_pki.PKCS11Config, validity int) (*RealCA, error) {
-	certData, err := os.ReadFile(certFile)
+func initializeBackend(backend *PKIBackendConfig) (*kritis3m_pki.KRITIS3MPKI, []*x509.Certificate, interface{}, error) {
+	if backend.Certificates == "" {
+		return nil, nil, nil, errors.New("no certificates provided")
+	}
+
+	certData, err := os.ReadFile(backend.Certificates)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read certificate file: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to read certificate file: %w", err)
+	}
+
+	// Parse certificates
+	certs, err := parseCertificates(certData)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to parse certificates: %w", err)
+	}
+
+	pkcs11Config := kritis3m_pki.PKCS11Config{
+		EntityModule: nil,
+		IssuerModule: &kritis3m_pki.PKCS11Module{
+			Path: backend.Module.Path,
+			Pin:  backend.Module.Pin,
+			Slot: backend.Module.Slot,
+		},
 	}
 
 	kritis3m_pki.Kritis3mPKI.LoadPKCS11Config(pkcs11Config)
 
-	keyData, key, err := kritis3m_pki.Kritis3mPKI.LoadPrivateKey(keyFile, kritis3m_pki.Kritis3mPKI.PKCS11.IssuerModule)
+	keyData, key, err := kritis3m_pki.Kritis3mPKI.LoadPrivateKey(backend.PrivateKey, kritis3m_pki.Kritis3mPKI.PKCS11.IssuerModule)
 	if err == nil {
 		kritis3m_pki.Kritis3mPKI.IssuerKey = key
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to load private key: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load private key: %w", err)
 	}
 
 	err = kritis3m_pki.Kritis3mPKI.LoadIssuerCert(certData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load issuer cert: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load issuer cert: %w", err)
 	}
 
-	// Parse certificates for RealCA
-	certs, err := parseCertificates(certData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse certificates: %w", err)
-	}
-
-	logger.Infof("Loaded CA certificates and key from %s and %s", certFile, keyFile)
-
-	return New(certs, keyData, logger, validity)
+	return kritis3m_pki.Kritis3mPKI, certs, keyData, nil
 }
 
-func parseCertificates(certData []byte) ([]*x509.Certificate, error) {
-	var certs []*x509.Certificate
-	for len(certData) > 0 {
-		var block *pem.Block
-		block, certData = pem.Decode(certData)
-		if block == nil {
-			break
-		}
-		if block.Type != "CERTIFICATE" {
-			continue
-		}
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return nil, err
-		}
-		certs = append(certs, cert)
+// getBackend returns the appropriate PKI backend for the given APS
+func (ca *RealCA) getBackend(aps string) (*kritis3m_pki.KRITIS3MPKI, []*x509.Certificate, interface{}) {
+	if backend, exists := ca.backends[aps]; exists {
+		return backend, ca.backendCerts[aps], ca.backendKeys[aps]
 	}
-	return certs, nil
+	return ca.defaultBackend, ca.backendCerts["default"], ca.backendKeys["default"]
 }
 
-// CACerts returns the CA certificates, unless the additional path segment is
-// "triggererrors", in which case an error is returned for testing purposes.
+// CACerts returns the CA certificates for the specified APS
 func (ca *RealCA) CACerts(
 	ctx context.Context,
 	aps string,
@@ -164,7 +183,8 @@ func (ca *RealCA) CACerts(
 		return nil, fmt.Errorf("failed to save request: %w", err)
 	}
 
-	return ca.certs, nil
+	_, certs, _ := ca.getBackend(aps)
+	return certs, nil
 }
 
 // CSRAttrs returns an empty sequence of CSR attributes, unless the additional
@@ -245,14 +265,20 @@ func (ca *RealCA) Enroll(
 		}
 	}
 
-	// Create certificate using aslPKI
-	err := kritis3m_pki.Kritis3mPKI.CreateCertificate(csr.Raw, ca.validity, false)
+	// Get the appropriate PKI backend for this APS
+	backend, certs, _ := ca.getBackend(aps)
+	if backend == nil {
+		return nil, fmt.Errorf("no PKI backend available for APS: %s", aps)
+	}
+
+	// Create certificate using the selected PKI backend
+	err := backend.CreateCertificate(csr.Raw, ca.validity, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
 
 	// Finalize the certificate
-	pemCertData, err := kritis3m_pki.Kritis3mPKI.FinalizeCertificate()
+	pemCertData, err := backend.FinalizeCertificate()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize certificate: %w", err)
 	}
@@ -276,8 +302,8 @@ func (ca *RealCA) Enroll(
 	}
 
 	// verify the certificate
-	if (cert.PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) && (ca.certs[0].PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) {
-		err = cert.CheckSignatureFrom(ca.certs[0])
+	if (cert.PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) && (certs[0].PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) {
+		err = cert.CheckSignatureFrom(certs[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to verify certificate: %w", err)
 		}
@@ -334,6 +360,30 @@ func (ca *RealCA) Reenroll(
 	r *http.Request,
 ) (*x509.Certificate, error) {
 	return ca.Enroll(ctx, csr, aps, r)
+}
+
+// parseCertificates parses a PEM-encoded certificate chain
+func parseCertificates(data []byte) ([]*x509.Certificate, error) {
+	var certs []*x509.Certificate
+	for {
+		block, rest := pem.Decode(data)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("expected CERTIFICATE, got %s", block.Type)
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse certificate: %w", err)
+		}
+		certs = append(certs, cert)
+		data = rest
+	}
+	if len(certs) == 0 {
+		return nil, errors.New("no certificates found")
+	}
+	return certs, nil
 }
 
 // ServerKeyGen creates a new RSA private key and then calls Enroll. It returns
@@ -410,19 +460,28 @@ func (ca *RealCA) ServerKeyGen(
 
 	switch aps {
 	case "pkcs7":
+		// Get the appropriate backend for this APS
+		_, backendCerts, backendKeys := ca.getBackend(aps)
+
 		// Create the CMS SignedData structure.
 		signedData, err := pkcs7.NewSignedData(keyDER)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create CMS SignedData: %w", err)
 		}
 
-		for i, cert := range ca.certs {
-			if i == 0 {
-				err := signedData.AddSigner(cert, ca.key, pkcs7.SignerInfoConfig{})
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to add signed to CMS SignedData: %w", err)
-				}
-			} else {
+		// Type assert the backend keys to the correct type
+		keys, ok := backendKeys.([]crypto.PrivateKey)
+		if !ok {
+			return nil, nil, fmt.Errorf("invalid backend keys type")
+		}
+
+		// Add the first certificate as a signer and the rest as certificates
+		if len(backendCerts) > 0 && len(keys) > 0 {
+			err := signedData.AddSigner(backendCerts[0], keys[0], pkcs7.SignerInfoConfig{})
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to add signer to CMS SignedData: %w", err)
+			}
+			for _, cert := range backendCerts[1:] {
 				signedData.AddCertificate(cert)
 			}
 		}
@@ -445,7 +504,7 @@ func (ca *RealCA) ServerKeyGen(
 	return cert, retDER, nil
 }
 
-func (ca *RealCA) RevocationList(ctx context.Context, r *http.Request) ([]byte, error) {
+func (ca *RealCA) RevocationList(ctx context.Context, r *http.Request, aps string) ([]byte, error) {
 	revokedCerts, found := ca.database.GetRevocations()
 	if !found {
 		return nil, fmt.Errorf("failed to get revoked certificates")
@@ -474,13 +533,16 @@ func (ca *RealCA) RevocationList(ctx context.Context, r *http.Request) ([]byte, 
 		NextUpdate:          time.Now().Add(time.Hour * 24),
 	}
 
+	// Get the appropriate backend for this APS
+	_, _, backendKeys := ca.getBackend(aps)
+
 	// PEM to DER
-	block, _ := pem.Decode(ca.key.([]byte))
+	block, _ := pem.Decode(backendKeys.([]byte))
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM data")
 	}
 
-	// Load Key from PEM -> ca.key.(*ecdsa.PrivateKey)
+	// Load Key from PEM -> ca.backendKeys[aps].(*ecdsa.PrivateKey)
 
 	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
@@ -488,11 +550,11 @@ func (ca *RealCA) RevocationList(ctx context.Context, r *http.Request) ([]byte, 
 	}
 
 	// Compare the public key in the certificate with the public key in the private key
-	if !bytes.Equal(ca.certs[0].PublicKey.(*ecdsa.PublicKey).X.Bytes(), key.(*ecdsa.PrivateKey).PublicKey.X.Bytes()) {
+	if !bytes.Equal(ca.backendCerts[aps][0].PublicKey.(*ecdsa.PublicKey).X.Bytes(), key.(*ecdsa.PrivateKey).PublicKey.X.Bytes()) {
 		return nil, fmt.Errorf("public key in the certificate does not match the public key in the private key")
 	}
 
-	list, err := x509.CreateRevocationList(rand.Reader, revocationList, ca.certs[0], key.(*ecdsa.PrivateKey))
+	list, err := x509.CreateRevocationList(rand.Reader, revocationList, ca.backendCerts[aps][0], key.(*ecdsa.PrivateKey))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create revocation list: %w", err)
 	}

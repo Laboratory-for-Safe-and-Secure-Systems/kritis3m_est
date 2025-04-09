@@ -84,16 +84,6 @@ func main() {
 		LogLevel:       int32(aslLogLevel),
 	}
 
-	// Load PKCS11 configuration
-	pkcs11Config := kritis3m_pki.PKCS11Config{
-		EntityModule: nil,
-		IssuerModule: &kritis3m_pki.PKCS11Module{
-			Path: cfg.RealCA.IssuerModule.Path,
-			Pin:  cfg.RealCA.IssuerModule.Pin,
-			Slot: cfg.RealCA.IssuerModule.Slot,
-		},
-	}
-
 	err = asl.ASLinit(libConfig)
 	if err != nil {
 		log.Fatalf("Error initializing ASL: %v", err)
@@ -184,7 +174,35 @@ func main() {
 	// Create CA.
 	var ca *realca.RealCA
 	if cfg.RealCA != nil {
-		ca, err = realca.Load(cfg.RealCA.Certs, cfg.RealCA.Key, logger, pkcs11Config, cfg.RealCA.Validity)
+		// Convert the configuration types to match the RealCA types
+		backends := make([]realca.PKIBackendConfig, len(cfg.RealCA.Backends))
+		for i, backend := range cfg.RealCA.Backends {
+			backends[i] = realca.PKIBackendConfig{
+				APS: backend.APS,
+				Module: &kritis3m_pki.PKCS11Module{
+					Path: backend.Module.Path,
+					Pin:  backend.Module.Pin,
+					Slot: backend.Module.Slot,
+				},
+				Certificates: backend.Certificates,
+				PrivateKey:   backend.PrivateKey,
+			}
+		}
+
+		var defaultBackend *realca.PKIBackendConfig
+		if cfg.RealCA.DefaultBackend != nil {
+			defaultBackend = &realca.PKIBackendConfig{
+				Module: &kritis3m_pki.PKCS11Module{
+					Path: cfg.RealCA.DefaultBackend.Module.Path,
+					Pin:  cfg.RealCA.DefaultBackend.Module.Pin,
+					Slot: cfg.RealCA.DefaultBackend.Module.Slot,
+				},
+				Certificates: cfg.RealCA.DefaultBackend.Certificates,
+				PrivateKey:   cfg.RealCA.DefaultBackend.PrivateKey,
+			}
+		}
+
+		ca, err = realca.New(backends, defaultBackend, logger, cfg.RealCA.Validity)
 		if err != nil {
 			log.Fatalf("failed to create CA: %v", err)
 		}
