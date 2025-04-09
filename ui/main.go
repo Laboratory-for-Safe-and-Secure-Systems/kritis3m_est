@@ -15,8 +15,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/db"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/alogger"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/db"
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog"
