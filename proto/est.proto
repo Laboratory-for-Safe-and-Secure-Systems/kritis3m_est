@@ -21,7 +21,7 @@ message EnrollCallResponse{
     int32 retval=1;
 }
 
-service ControlPlane {
+service EstService {
     rpc EnrollCall(EnrollCallRequest) returns (EnrollCallResponse);
 }
 

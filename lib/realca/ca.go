@@ -19,10 +19,15 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/gen/go/v1"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/db"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/kritis3m_pki"
+	"github.com/rs/zerolog/log"
 	"go.mozilla.org/pkcs7"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Global variables.
@@ -48,6 +53,69 @@ const (
 	pkixPublicKeyPEMType   = "PUBLIC KEY"
 	pkcs1PublicKeyPEMType  = "RSA PUBLIC KEY"
 )
+
+func getClient() (context.Context, v1.EstServiceClient, *grpc.ClientConn, context.CancelFunc, error) {
+	// lets make grpc static
+	// grpc is at
+	//grpc_listen_addr: 127.0.0.1:50443
+	timeout, err := time.ParseDuration("20s")
+	if err != nil {
+		log.Err(err).Msg("Could not parse duration")
+		return nil, nil, nil, nil, err
+	}
+	log.Debug().
+		Dur("timeout", timeout).
+		Msgf("Setting timeout")
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
+	grpcOptions := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	address := "127.0.0.1:50443"
+	log.Trace().Caller().Str("address", address).Msg("Connecting via gRPC")
+
+	conn, err := grpc.NewClient(address, grpcOptions...)
+	if err != nil {
+		log.Fatal().Caller().Err(err).Msgf("Could not connect: %v", err)
+		return nil, nil, nil, nil, err
+	}
+
+	client := v1.NewEstServiceClient(conn)
+
+	return ctx, client, conn, cancel, nil
+}
+
+func notifyKris3mScale(serial_number string, est_serial_number string, organization string, issued_at time.Time, expiration time.Time, signature_algo string) error {
+	// Get gRPC client
+	ctx, client, conn, cancel, err := getClient()
+	if err != nil {
+		return fmt.Errorf("failed to get gRPC client: %w", err)
+	}
+	defer cancel()
+	defer conn.Close()
+
+	// Create request
+	req := &v1.EnrollCallRequest{
+		EstSerialNumber:    est_serial_number,
+		SerialNumber:       serial_number,
+		Organization:       organization,
+		IssuedAt:           timestamppb.New(issued_at),
+		ExpiresAt:          timestamppb.New(expiration),
+		SignatureAlgorithm: signature_algo,
+	}
+
+	// Send request
+	resp, err := client.EnrollCall(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to send EnrollCall: %w", err)
+	}
+
+	// Check response
+	if resp.Retval != 0 {
+		return fmt.Errorf("EnrollCall failed with retval: %d", resp.Retval)
+	}
+
+	return nil
+}
 
 // RealCA is a simple CA implementation that uses a single key pair and
 // certificate to sign requests.
