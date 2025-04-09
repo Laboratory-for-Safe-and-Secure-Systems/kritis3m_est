@@ -238,6 +238,9 @@ func cacerts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	aps := chi.URLParam(r, apsParamName)
 
+	logger := LoggerFromContext(ctx)
+	logger.Infof("CACerts request for APS: %s", aps)
+
 	certs, err := caFromContext(ctx).CACerts(ctx, aps, r)
 	if writeOnError(ctx, w, logMsgCACertsFailed, err) {
 		return
@@ -409,9 +412,9 @@ func serverkeygen(w http.ResponseWriter, r *http.Request) {
 
 func getRevocationList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
+	aps := chi.URLParam(r, apsParamName)
 	// Get the CRL from the CA
-	crl, err := caFromContext(ctx).RevocationList(ctx, r)
+	crl, err := caFromContext(ctx).RevocationList(ctx, r, aps)
 	if err != nil {
 		http.Error(w, "Failed to get revocation list", http.StatusInternalServerError)
 		fmt.Printf("Failed to get revocation list: %v", err)
