@@ -54,6 +54,13 @@ const (
 	pkcs1PublicKeyPEMType  = "RSA PUBLIC KEY"
 )
 
+type plane_type string
+
+const (
+	plane_control plane_type = "control_plane"
+	plane_data    plane_type = "data_plane"
+)
+
 func getClient() (context.Context, v1.EstServiceClient, *grpc.ClientConn, context.CancelFunc, error) {
 	// lets make grpc static
 	// grpc is at
@@ -84,7 +91,7 @@ func getClient() (context.Context, v1.EstServiceClient, *grpc.ClientConn, contex
 	return ctx, client, conn, cancel, nil
 }
 
-func notifyKris3mScale(serial_number string, est_serial_number string, organization string, issued_at time.Time, expiration time.Time, signature_algo string) error {
+func notifyKris3mScale(serial_number string, est_serial_number string, organization string, issued_at time.Time, expiration time.Time, signature_algo string, plane plane_type) error {
 	// Get gRPC client
 	ctx, client, conn, cancel, err := getClient()
 	if err != nil {
@@ -101,6 +108,7 @@ func notifyKris3mScale(serial_number string, est_serial_number string, organizat
 		IssuedAt:           timestamppb.New(issued_at),
 		ExpiresAt:          timestamppb.New(expiration),
 		SignatureAlgorithm: signature_algo,
+		Plane:              string(plane),
 	}
 
 	// Send request

@@ -15,6 +15,7 @@ message EnrollCallRequest{
     google.protobuf.Timestamp issued_at = 4;
     google.protobuf.Timestamp expires_at = 5;
     string signature_algorithm = 6;
+    string plane=7;
 }
 
 message EnrollCallResponse{
