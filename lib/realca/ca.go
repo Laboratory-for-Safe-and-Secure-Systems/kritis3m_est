@@ -19,10 +19,10 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/gen/go/v1"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/db"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/kritis3m_pki"
+	grpc_est "github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_proto/est"
 	"github.com/rs/zerolog/log"
 	"go.mozilla.org/pkcs7"
 	"google.golang.org/grpc"
@@ -61,7 +61,7 @@ const (
 	plane_data    plane_type = "data_plane"
 )
 
-func getClient() (context.Context, v1.EstServiceClient, *grpc.ClientConn, context.CancelFunc, error) {
+func getClient() (context.Context, grpc_est.EstServiceClient, *grpc.ClientConn, context.CancelFunc, error) {
 	// lets make grpc static
 	// grpc is at
 	//grpc_listen_addr: 127.0.0.1:50443
@@ -86,7 +86,7 @@ func getClient() (context.Context, v1.EstServiceClient, *grpc.ClientConn, contex
 		return nil, nil, nil, nil, err
 	}
 
-	client := v1.NewEstServiceClient(conn)
+	client := grpc_est.NewEstServiceClient(conn)
 
 	return ctx, client, conn, cancel, nil
 }
@@ -101,7 +101,7 @@ func notifyKris3mScale(serial_number string, est_serial_number string, organizat
 	defer conn.Close()
 
 	// Create request
-	req := &v1.EnrollCallRequest{
+	req := &grpc_est.EnrollCallRequest{
 		EstSerialNumber:    est_serial_number,
 		SerialNumber:       serial_number,
 		Organization:       organization,
