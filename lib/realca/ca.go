@@ -406,12 +406,34 @@ func (ca *RealCA) Enroll(
 			return nil, fmt.Errorf("failed to save certificate: %w", err)
 		}
 
+		if aps == "controlplane" || aps == "dataplane" {
+			notifyKris3mScale(r.URL.Path,
+				cert.Subject.CommonName,
+				cert.SerialNumber.String(),
+				cert.NotBefore,
+				cert.NotAfter,
+				cert.SignatureAlgorithm.String(),
+				plane_type(aps))
+
+		}
+
 		ca.logger.Infof("Certificate reenrolled for %s with serial number %s", cert.Subject.CommonName, hexSerialString)
 
 		ca.database.DisablePreviousCerts(cert.Subject.CommonName, hexSerialString)
 
 		ca.logger.Debugf("Revoking previous certificates for %s", cert.Subject.CommonName)
 	} else {
+
+		if aps == "controlplane" || aps == "dataplane" {
+			notifyKris3mScale(r.URL.Path,
+				cert.Subject.CommonName,
+				cert.SerialNumber.String(),
+				cert.NotBefore,
+				cert.NotAfter,
+				cert.SignatureAlgorithm.String(),
+				plane_type(aps))
+
+		}
 		err = ca.database.SaveCertificateFromSubject(cert.Subject.CommonName, *cert)
 		if err != nil {
 			return nil, fmt.Errorf("failed to save certificate: %w", err)
