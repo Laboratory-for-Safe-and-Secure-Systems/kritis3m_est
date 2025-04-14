@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/realca"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/lib/realca"
 )
 
 // config contains the EST server configuration.
