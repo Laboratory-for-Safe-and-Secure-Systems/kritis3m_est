@@ -6,7 +6,7 @@ toolchain go1.24.0
 
 require (
 	github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl v1.1.8
-	github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_proto v0.0.0-20250409131106-2be03ee65863
+	github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_proto v0.0.0-20250416103654-cc8a5f9725e6
 	github.com/ThalesIgnite/crypto11 v1.2.5
 	github.com/globalsign/pemfile v1.0.0
 	github.com/go-chi/chi/v5 v5.2.1

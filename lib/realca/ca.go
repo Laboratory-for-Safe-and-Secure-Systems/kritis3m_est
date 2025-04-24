@@ -407,14 +407,14 @@ func (ca *RealCA) Enroll(
 		}
 
 		if aps == "controlplane" || aps == "dataplane" {
-			notifyKris3mScale(r.URL.Path,
+			notifyKris3mScale(
 				cert.Subject.CommonName,
 				cert.SerialNumber.String(),
+				strings.Join(cert.Subject.Organization, ","),
 				cert.NotBefore,
 				cert.NotAfter,
 				cert.SignatureAlgorithm.String(),
 				plane_type(aps))
-
 		}
 
 		ca.logger.Infof("Certificate reenrolled for %s with serial number %s", cert.Subject.CommonName, hexSerialString)
@@ -425,14 +425,14 @@ func (ca *RealCA) Enroll(
 	} else {
 
 		if aps == "controlplane" || aps == "dataplane" {
-			notifyKris3mScale(r.URL.Path,
+			notifyKris3mScale(
 				cert.Subject.CommonName,
 				cert.SerialNumber.String(),
+				strings.Join(cert.Subject.Organization, ","),
 				cert.NotBefore,
 				cert.NotAfter,
 				cert.SignatureAlgorithm.String(),
 				plane_type(aps))
-
 		}
 		err = ca.database.SaveCertificateFromSubject(cert.Subject.CommonName, *cert)
 		if err != nil {
