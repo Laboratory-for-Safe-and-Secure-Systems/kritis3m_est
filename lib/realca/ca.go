@@ -172,11 +172,16 @@ func New(backends []PKIBackendConfig, defaultBackend *PKIBackendConfig, logger e
 		if backend.APS == "" {
 			return nil, errors.New("backend APS cannot be empty")
 		}
-
 		pki, certs, key, err := initializeBackend(&backend)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize backend for APS %s: %w", backend.APS, err)
 		}
+		//debug the backends
+		ca.logger.Debugf("APS: %s, Intended Issuer Cert Subject: %s\n", backend.APS, certs[0].Subject.String())
+		ca.logger.Debugf("APS: %s, Intended Issuer Cert Issuer: %s\n", backend.APS, certs[0].Issuer.String())
+		ca.logger.Debugf("APS: %s, Intended Issuer Cert Serial: %s\n", backend.APS, certs[0].SerialNumber.String())
+		ca.logger.Debugf("APS: %s, Intended Issuer Cert Signature Algo: %s\n", backend.APS, certs[0].SignatureAlgorithm.String())
+
 		ca.backends[backend.APS] = pki
 		ca.backendCerts[backend.APS] = certs
 		ca.backendKeys[backend.APS] = key
@@ -216,23 +221,43 @@ func initializeBackend(backend *PKIBackendConfig) (*kritis3m_pki.KRITIS3MPKI, []
 			Slot: backend.Module.Slot,
 		},
 	}
+	if backend.APS == "dataplane" {
 
-	kritis3m_pki.Kritis3mPKI.LoadPKCS11Config(pkcs11Config)
+		kritis3m_pki.Kritis3mPKI.LoadPKCS11Config(pkcs11Config)
 
-	keyData, key, err := kritis3m_pki.Kritis3mPKI.LoadPrivateKey(backend.PrivateKey, kritis3m_pki.Kritis3mPKI.PKCS11.IssuerModule)
-	if err == nil {
-		kritis3m_pki.Kritis3mPKI.IssuerKey = key
+		keyData, key, err := kritis3m_pki.Kritis3mPKI.LoadPrivateKey(backend.PrivateKey, kritis3m_pki.Kritis3mPKI.PKCS11.IssuerModule)
+		if err == nil {
+			kritis3m_pki.Kritis3mPKI.IssuerKey = key
+		}
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load private key: %w", err)
+		}
+
+		err = kritis3m_pki.Kritis3mPKI.LoadIssuerCert(certData)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load issuer cert: %w", err)
+		}
+
+		return kritis3m_pki.Kritis3mPKI, certs, keyData, nil
+	} else {
+
+		kritis3m_pki.DATAPLANEPKI.LoadPKCS11Config(pkcs11Config)
+
+		keyData, key, err := kritis3m_pki.DATAPLANEPKI.LoadPrivateKey(backend.PrivateKey, kritis3m_pki.DATAPLANEPKI.PKCS11.IssuerModule)
+		if err == nil {
+			kritis3m_pki.DATAPLANEPKI.IssuerKey = key
+		}
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load private key: %w", err)
+		}
+
+		err = kritis3m_pki.DATAPLANEPKI.LoadIssuerCert(certData)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to load issuer cert: %w", err)
+		}
+
+		return kritis3m_pki.DATAPLANEPKI, certs, keyData, nil
 	}
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load private key: %w", err)
-	}
-
-	err = kritis3m_pki.Kritis3mPKI.LoadIssuerCert(certData)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load issuer cert: %w", err)
-	}
-
-	return kritis3m_pki.Kritis3mPKI, certs, keyData, nil
 }
 
 // getBackend returns the appropriate PKI backend for the given APS
@@ -346,6 +371,9 @@ func (ca *RealCA) Enroll(
 	if backend == nil {
 		return nil, fmt.Errorf("no PKI backend available for APS: %s", aps)
 	}
+	fmt.Printf("APS: %s, Intended Issuer Cert Subject: %s\n", aps, certs[0].Subject.String())
+	fmt.Printf("APS: %s, Intended Issuer Cert Issuer: %s\n", aps, certs[0].Issuer.String())
+	fmt.Printf("APS: %s, Intended Issuer Cert Serial: %s\n", aps, certs[0].SerialNumber.String())
 
 	// Create certificate using the selected PKI backend
 	err := backend.CreateCertificate(csr.Raw, ca.validity, false)
@@ -376,6 +404,11 @@ func (ca *RealCA) Enroll(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse certificate: %w", err)
 	}
+	// Log details of the newly created certificate
+	fmt.Printf("APS: %s, Newly Created Cert Subject: %s\n", aps, cert.Subject.String())
+	fmt.Printf("APS: %s, Newly Created Cert Issuer: %s\n", aps, cert.Issuer.String()) // This should match certs[0].Subject
+	fmt.Printf("APS: %s, Newly Created Cert Serial: %s\n", aps, cert.SerialNumber.String())
+	fmt.Printf("APS: %s, Newly Created Cert Signature Algo: %s\n", aps, cert.SignatureAlgorithm.String())
 
 	// verify the certificate
 	if (cert.PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) && (certs[0].PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) {

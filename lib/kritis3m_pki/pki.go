@@ -122,6 +122,7 @@ const (
 
 var logger est.Logger
 var Kritis3mPKI *KRITIS3MPKI
+var DATAPLANEPKI *KRITIS3MPKI
 
 // Create instance of PKI globally
 // NewKRITIS3MPKI creates a new KRITIS3MPKI instance
@@ -137,8 +138,12 @@ func InitPKI(config *KRITIS3MPKIConfiguration) error {
 		Error:         &KRITIS3MPKIError{},
 	}
 
-	logLevel := zerolog.WarnLevel
+	DATAPLANEPKI = &KRITIS3MPKI{
+		Configuration: config,
+		Error:         &KRITIS3MPKIError{},
+	}
 
+	logLevel := zerolog.Level(config.LogLevel)
 	switch config.LogLevel {
 	case KRITIS3M_PKI_LOG_LEVEL_ERR:
 		logLevel = zerolog.ErrorLevel
