@@ -371,9 +371,9 @@ func (ca *RealCA) Enroll(
 	if backend == nil {
 		return nil, fmt.Errorf("no PKI backend available for APS: %s", aps)
 	}
-	fmt.Printf("APS: %s, Intended Issuer Cert Subject: %s\n", aps, certs[0].Subject.String())
-	fmt.Printf("APS: %s, Intended Issuer Cert Issuer: %s\n", aps, certs[0].Issuer.String())
-	fmt.Printf("APS: %s, Intended Issuer Cert Serial: %s\n", aps, certs[0].SerialNumber.String())
+	ca.logger.Debugf("APS: %s, Intended Issuer Cert Subject: %s\n", aps, certs[0].Subject.String())
+	ca.logger.Debugf("APS: %s, Intended Issuer Cert Issuer: %s\n", aps, certs[0].Issuer.String())
+	ca.logger.Debugf("APS: %s, Intended Issuer Cert Serial: %s\n", aps, certs[0].SerialNumber.String())
 
 	// Create certificate using the selected PKI backend
 	err := backend.CreateCertificate(csr.Raw, ca.validity, false)
@@ -405,10 +405,10 @@ func (ca *RealCA) Enroll(
 		return nil, fmt.Errorf("failed to parse certificate: %w", err)
 	}
 	// Log details of the newly created certificate
-	fmt.Printf("APS: %s, Newly Created Cert Subject: %s\n", aps, cert.Subject.String())
-	fmt.Printf("APS: %s, Newly Created Cert Issuer: %s\n", aps, cert.Issuer.String()) // This should match certs[0].Subject
-	fmt.Printf("APS: %s, Newly Created Cert Serial: %s\n", aps, cert.SerialNumber.String())
-	fmt.Printf("APS: %s, Newly Created Cert Signature Algo: %s\n", aps, cert.SignatureAlgorithm.String())
+	ca.logger.Debugf("APS: %s, Newly Created Cert Subject: %s\n", aps, cert.Subject.String())
+	ca.logger.Debugf("APS: %s, Newly Created Cert Issuer: %s\n", aps, cert.Issuer.String()) // This should match certs[0].Subject
+	ca.logger.Debugf("APS: %s, Newly Created Cert Serial: %s\n", aps, cert.SerialNumber.String())
+	ca.logger.Debugf("APS: %s, Newly Created Cert Signature Algo: %s\n", aps, cert.SignatureAlgorithm.String())
 
 	// verify the certificate
 	if (cert.PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) && (certs[0].PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm) {
