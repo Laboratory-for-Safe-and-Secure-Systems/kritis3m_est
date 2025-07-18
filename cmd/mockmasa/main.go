@@ -1,16 +1,15 @@
 package main
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
+	"fmt"
 	"log"
-	"math/big"
-	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -62,14 +61,8 @@ type VoucherResponse struct {
 }
 
 func main() {
-	// Generate MASA key pair and certificate
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		log.Fatalf("Failed to generate private key: %v", err)
-	}
-
 	// Create MASA certificate
-	cert, err := createMASACertificate(privateKey)
+	cert, privateKey, err := createMASACertificate()
 	if err != nil {
 		log.Fatalf("Failed to create MASA certificate: %v", err)
 	}
@@ -102,8 +95,10 @@ func main() {
 		w.Write([]byte("MASA server is running"))
 	})
 
-	// Create TLS configuration
+	// Create TLS configuration for MASA
+	// For testing purposes, we'll accept any client certificate
 	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
 		Certificates: []tls.Certificate{
 			{
 				Certificate: [][]byte{cert.Raw},
@@ -129,54 +124,55 @@ func main() {
 }
 
 // createMASACertificate creates a self-signed certificate for the MASA
-func createMASACertificate(privateKey *rsa.PrivateKey) (*x509.Certificate, error) {
-	// Create certificate template
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization:  []string{"Mock MASA Organization"},
-			Country:       []string{"US"},
-			Province:      []string{"CA"},
-			Locality:      []string{"San Francisco"},
-			StreetAddress: []string{"123 MASA Street"},
-			PostalCode:    []string{"94105"},
-			CommonName:    "masa.example.com",
-		},
-		Issuer: pkix.Name{
-			Organization:  []string{"Mock MASA Organization"},
-			Country:       []string{"US"},
-			Province:      []string{"CA"},
-			Locality:      []string{"San Francisco"},
-			StreetAddress: []string{"123 MASA Street"},
-			PostalCode:    []string{"94105"},
-			CommonName:    "masa.example.com",
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(1, 0, 0), // Valid for 1 year
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              []string{"masa.example.com", "localhost"},
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+func createMASACertificate() (*x509.Certificate, *rsa.PrivateKey, error) {
+	// Load MASA Cert from file
+	certData, err := os.ReadFile("./certs/vendor.crt")
+	if err != nil {
+		return nil, nil, err
 	}
 
-	// Create certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		return nil, err
+	// Decode certificate
+	certDER, rest := pem.Decode(certData)
+	if len(rest) > 0 {
+		return nil, nil, fmt.Errorf("unexpected data after certificate")
 	}
 
 	// Parse certificate
-	cert, err := x509.ParseCertificate(certDER)
+	cert, err := x509.ParseCertificate(certDER.Bytes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return cert, nil
+	// Load private key from file
+	privateKeyBytes, err := os.ReadFile("./certs/vendor.key")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Decode private key
+	privateKeyDER, rest := pem.Decode(privateKeyBytes)
+	if len(rest) > 0 {
+		return nil, nil, fmt.Errorf("unexpected data after private key")
+	}
+
+	// Parse private key
+	privateKey, err := x509.ParsePKCS8PrivateKey(privateKeyDER.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, privateKey.(*rsa.PrivateKey), nil
 }
 
 // handleRequestVoucher handles voucher requests from pledges
 func (m *MockMASA) handleRequestVoucher(w http.ResponseWriter, r *http.Request) {
+	// Check content type - accept both application/json and application/jose+json
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "application/json" && contentType != "application/jose+json" {
+		http.Error(w, "Invalid content type, expected application/json or application/jose+json", http.StatusBadRequest)
+		return
+	}
+
 	// Parse voucher request
 	var voucherReq VoucherRequest
 	if err := json.NewDecoder(r.Body).Decode(&voucherReq); err != nil {
@@ -213,8 +209,12 @@ func (m *MockMASA) handleRequestVoucher(w http.ResponseWriter, r *http.Request) 
 		Voucher: voucher,
 	}
 
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
+	// Send response - use the same content type as the request
+	responseContentType := "application/json"
+	if contentType == "application/jose+json" {
+		responseContentType = "application/jose+json"
+	}
+	w.Header().Set("Content-Type", responseContentType)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 

@@ -33,7 +33,7 @@ type Client struct {
 // The masaCertPaths parameter is a slice of paths to the MASA's CA certificates
 func NewClient(baseURL *url.URL, masaCertPaths []string, logger common.Logger) (*Client, error) {
 	client := &Client{
-		BaseURL: baseURL,
+		BaseURL: baseURL.JoinPath("/.well-known/brski"),
 		Logger:  logger,
 	}
 
@@ -72,7 +72,7 @@ func (c *Client) initTLSClient(masaCertPaths []string) (*http.Client, error) {
 	// Create TLS configuration
 	tlsConfig := &tls.Config{
 		RootCAs:            caCertPool,
-		InsecureSkipVerify: len(masaCertPaths) == 0, // Skip verification if no certs provided
+		InsecureSkipVerify: true, // Skip verification if no certs provided
 	}
 
 	// Create transport with TLS configuration

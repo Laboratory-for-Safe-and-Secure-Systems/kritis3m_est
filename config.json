@@ -52,7 +52,7 @@
         },
         "masa_certs": {
             "example.com": [
-                "/home/ayham/repo/kritis3m_workspace/certificates/test_certs/masa_cert.pem"
+                "/home/ayham/repo/brski-est/certs/vendor.crt"
             ]
         },
         "voucher_cache_dir": "/tmp/vouchers",

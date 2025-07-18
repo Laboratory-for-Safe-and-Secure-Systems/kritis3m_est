@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -19,6 +18,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	// Import the internal EST client library
+	"bytes"
+	"io"
+
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/brski/voucher"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 )
 
 // MockPledge represents a mock BRSKI pledge
@@ -32,6 +39,12 @@ type MockPledge struct {
 
 	// BRSKI state
 	brskiState *BRSKIState
+
+	// EST client for enrollment (connects to local registrar)
+	estClient *est.Client
+
+	// Logger
+	logger common.Logger
 }
 
 // BRSKIState represents the BRSKI enrollment state
@@ -44,38 +57,55 @@ type BRSKIState struct {
 	LastActivity    time.Time         `json:"last_activity"`
 }
 
-// VoucherRequest represents a voucher request to MASA
-type VoucherRequest struct {
-	SerialNumber string `json:"serial-number"`
-	DomainCert   string `json:"domain-cert"`
-	Nonce        string `json:"nonce"`
-	Assertion    string `json:"assertion"`
+// Note: Using internal library types for VoucherRequest, Voucher, etc.
+// from github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/brski/voucher
+
+// mockLogger implements the common.Logger interface for the mock pledge
+type mockLogger struct{}
+
+func (l *mockLogger) Errorf(format string, args ...interface{}) {
+	log.Printf("[ERROR] "+format, args...)
 }
 
-// VoucherResponse represents a voucher response from MASA
-type VoucherResponse struct {
-	Voucher *Voucher `json:"voucher"`
+func (l *mockLogger) Errorw(msg string, keysAndValues ...interface{}) {
+	log.Printf("[ERROR] %s", msg)
 }
 
-// Voucher represents a BRSKI voucher
-type Voucher struct {
-	SerialNumber     string    `json:"serial-number"`
-	CreatedOn        time.Time `json:"created-on"`
-	ExpiresOn        time.Time `json:"expires-on"`
-	Assertion        string    `json:"assertion"`
-	PinnedDomainCert string    `json:"pinned-domain-cert"`
-	Status           string    `json:"status"`
+func (l *mockLogger) Infof(format string, args ...interface{}) {
+	log.Printf("[INFO] "+format, args...)
 }
 
-// EnrollmentRequest represents an enrollment request to EST server
-type EnrollmentRequest struct {
-	CSR string `json:"csr"`
+func (l *mockLogger) Infow(msg string, keysAndValues ...interface{}) {
+	log.Printf("[INFO] %s", msg)
 }
 
-// EnrollmentResponse represents an enrollment response from EST server
-type EnrollmentResponse struct {
-	Certificate string `json:"certificate"`
+func (l *mockLogger) Debugf(format string, args ...interface{}) {
+	log.Printf("[DEBUG] "+format, args...)
 }
+
+func (l *mockLogger) Debugw(msg string, keysAndValues ...interface{}) {
+	log.Printf("[DEBUG] %s", msg)
+}
+
+func (l *mockLogger) With(keysAndValues ...interface{}) common.Logger {
+	return l
+}
+
+func (l *mockLogger) Info() common.LogEvent {
+	return &mockLogEvent{}
+}
+
+func (l *mockLogger) Fatal() common.LogEvent {
+	return &mockLogEvent{}
+}
+
+type mockLogEvent struct{}
+
+func (e *mockLogEvent) Msg(msg string)                          {}
+func (e *mockLogEvent) Msgf(format string, args ...interface{}) {}
+func (e *mockLogEvent) Err(err error) common.LogEvent           { return e }
+func (e *mockLogEvent) Str(key, val string) common.LogEvent     { return e }
+func (e *mockLogEvent) Int(key string, val int) common.LogEvent { return e }
 
 func main() {
 	// Create pledge certificate
@@ -87,11 +117,25 @@ func main() {
 	// Generate unique serial number
 	serialNumber := fmt.Sprintf("PLEDGE-%d", time.Now().Unix())
 
+	// Create logger
+	logger := &mockLogger{}
+
+	// Create EST client that connects to the local registrar (not MASA)
+	// The pledge is air-gapped and can only reach the local registrar
+	estClient := &est.Client{
+		Host:               "localhost:8443", // Local registrar EST server
+		CertificatePath:    "./certs/pledge1.crt",
+		PrivateKeyPath:     "./certs/pledge1.key",
+		InsecureSkipVerify: true, // For testing only
+	}
+
 	// Create mock pledge
 	pledge := &MockPledge{
 		privateKey:   privateKey,
 		cert:         cert,
 		serialNumber: serialNumber,
+		estClient:    estClient,
+		logger:       logger,
 		brskiState: &BRSKIState{
 			Status:          "initialized",
 			VoucherReceived: false,
@@ -136,6 +180,7 @@ func main() {
 	log.Printf("Mock pledge starting on :8445")
 	log.Printf("Pledge serial number: %s", serialNumber)
 	log.Printf("Pledge certificate subject: %s", cert.Subject)
+	log.Printf("Pledge is air-gapped and will only communicate with local registrar at localhost:8443")
 
 	if err := server.ListenAndServeTLS("", ""); err != nil {
 		log.Fatalf("Failed to start pledge server: %v", err)
@@ -194,42 +239,40 @@ func (p *MockPledge) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 // handleRequestVoucher initiates BRSKI voucher request
 func (p *MockPledge) handleRequestVoucher(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Starting BRSKI voucher request for pledge %s", p.serialNumber)
+	p.logger.Infof("Starting BRSKI voucher request for pledge %s", p.serialNumber)
 
-	// Step 1: Discover EST server (in real implementation, this would be via mDNS or DHCP)
-	estServerURL := "https://localhost:8443"
-	masaURL := "https://localhost:8444"
-
-	// Step 2: Get domain certificate from EST server
-	domainCert, err := p.getDomainCertificate(estServerURL)
+	// Step 1: Get domain certificate from local registrar using the EST client
+	// The pledge is air-gapped and can only reach the local registrar
+	domainCerts, err := p.getDomainCertificate()
 	if err != nil {
-		log.Printf("Failed to get domain certificate: %v", err)
-		http.Error(w, "Failed to get domain certificate", http.StatusInternalServerError)
+		p.logger.Errorf("Failed to get domain certificate from local registrar: %v", err)
+		http.Error(w, "Failed to get domain certificate from local registrar", http.StatusInternalServerError)
 		return
 	}
 
-	// Step 3: Request voucher from MASA
-	voucher, err := p.requestVoucherFromMASA(masaURL, domainCert)
+	// Step 2: Request voucher from local registrar (not MASA directly)
+	// The registrar will proxy the request to the MASA
+	voucher, err := p.requestVoucherFromRegistrar(domainCerts)
 	if err != nil {
-		log.Printf("Failed to request voucher from MASA: %v", err)
-		http.Error(w, "Failed to request voucher from MASA", http.StatusInternalServerError)
+		p.logger.Errorf("Failed to request voucher from local registrar: %v", err)
+		http.Error(w, "Failed to request voucher from local registrar", http.StatusInternalServerError)
 		return
 	}
 
-	// Step 4: Update BRSKI state
+	// Step 3: Update BRSKI state
 	p.brskiState.VoucherReceived = true
 	p.brskiState.Status = "voucher_received"
 	p.brskiState.LastActivity = time.Now()
 
-	// Step 5: Enroll with EST server
-	err = p.enrollWithEST(estServerURL)
+	// Step 4: Enroll with local registrar using the EST client
+	err = p.enrollWithEST()
 	if err != nil {
-		log.Printf("Failed to enroll with EST server: %v", err)
-		http.Error(w, "Failed to enroll with EST server", http.StatusInternalServerError)
+		p.logger.Errorf("Failed to enroll with local registrar: %v", err)
+		http.Error(w, "Failed to enroll with local registrar", http.StatusInternalServerError)
 		return
 	}
 
-	// Step 6: Update final state
+	// Step 5: Update final state
 	p.brskiState.Enrolled = true
 	p.brskiState.Status = "enrolled"
 	p.brskiState.LastActivity = time.Now()
@@ -240,23 +283,22 @@ func (p *MockPledge) handleRequestVoucher(w http.ResponseWriter, r *http.Request
 		"serial_number": p.serialNumber,
 		"voucher":       voucher,
 		"enrolled":      true,
+		"note":          "Pledge is air-gapped and only communicates with local registrar",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 
-	log.Printf("BRSKI enrollment completed successfully for pledge %s", p.serialNumber)
+	p.logger.Infof("BRSKI enrollment completed successfully for pledge %s via local registrar", p.serialNumber)
 }
 
 // handleEnroll handles manual enrollment requests
 func (p *MockPledge) handleEnroll(w http.ResponseWriter, r *http.Request) {
-	estServerURL := "https://localhost:8443"
-
-	err := p.enrollWithEST(estServerURL)
+	err := p.enrollWithEST()
 	if err != nil {
-		log.Printf("Failed to enroll with EST server: %v", err)
-		http.Error(w, "Failed to enroll with EST server", http.StatusInternalServerError)
+		p.logger.Errorf("Failed to enroll with local registrar: %v", err)
+		http.Error(w, "Failed to enroll with local registrar", http.StatusInternalServerError)
 		return
 	}
 
@@ -267,6 +309,7 @@ func (p *MockPledge) handleEnroll(w http.ResponseWriter, r *http.Request) {
 	response := map[string]any{
 		"status":   "success",
 		"enrolled": true,
+		"note":     "Enrolled via local registrar (air-gapped pledge)",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -274,8 +317,43 @@ func (p *MockPledge) handleEnroll(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// getDomainCertificate retrieves the domain certificate from EST server
-func (p *MockPledge) getDomainCertificate(estServerURL string) (string, error) {
+// getDomainCertificate retrieves the domain certificate from local registrar using the EST client
+func (p *MockPledge) getDomainCertificate() ([]*x509.Certificate, error) {
+	ctx := context.Background()
+
+	// Use the EST client to get CA certificates from the local registrar
+	// The pledge is air-gapped and can only reach the local registrar
+	certs, err := p.estClient.CACerts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CA certificates from local registrar: %w", err)
+	}
+
+	p.logger.Infof("Retrieved %d CA certificates from local registrar", len(certs))
+	return certs, nil
+}
+
+// requestVoucherFromRegistrar requests a voucher from the local registrar
+// The registrar will proxy the request to the MASA (the pledge cannot reach MASA directly)
+func (p *MockPledge) requestVoucherFromRegistrar(domainCerts []*x509.Certificate) (*voucher.Voucher, error) {
+	// Create voucher request using the voucher package
+	voucherReq := &voucher.VoucherRequest{
+		SerialNumber:  voucher.SerialNumber(p.serialNumber),
+		Nonce:         fmt.Sprintf("nonce-%d", time.Now().Unix()),
+		AssertionInfo: voucher.AssertionVerified,
+		CreatedOn:     time.Now(),
+	}
+
+	// If we have domain certificates, use the first one as the proximity registrar cert
+	if len(domainCerts) > 0 {
+		voucherReq.ProximityRegistrarCert = domainCerts[0].Raw
+	}
+
+	// Encode the voucher request to JSON
+	requestBody, err := voucher.EncodeVoucherRequest(voucherReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode voucher request: %w", err)
+	}
+
 	// Create HTTP client that skips TLS verification for testing
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -291,89 +369,54 @@ func (p *MockPledge) getDomainCertificate(estServerURL string) (string, error) {
 		},
 	}
 
-	// Request CA certificates from EST server
-	resp, err := client.Get(estServerURL + "/.well-known/est/cacerts")
+	// Make request to the registrar's BRSKI requestvoucher endpoint
+	// This is the actual endpoint implemented in the EST server
+	requestURL := "https://localhost:8443/.well-known/brski/requestvoucher"
+
+	p.logger.Infof("Sending voucher request to local registrar BRSKI endpoint: %s", requestURL)
+
+	req, err := http.NewRequest("POST", requestURL, bytes.NewReader(requestBody))
 	if err != nil {
-		return "", fmt.Errorf("failed to get CA certificates: %w", err)
+		return nil, fmt.Errorf("failed to create voucher request: %w", err)
+	}
+
+	// Set the appropriate headers for BRSKI voucher request
+	// The EST server expects JSON input and returns JSON output
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	// Send the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send voucher request to registrar: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("EST server returned status: %d", resp.StatusCode)
+	// Read the response body
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read voucher response: %w", err)
 	}
 
-	// For simplicity, we'll return a placeholder domain certificate
-	// In a real implementation, you would parse the PKCS#7 response
-	return "-----BEGIN CERTIFICATE-----\nMOCK_DOMAIN_CERT\n-----END CERTIFICATE-----", nil
+	// Check the response status code
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("registrar returned error status: %d, body: %s", resp.StatusCode, respBody)
+	}
+
+	// Decode the voucher from the response
+	v, err := voucher.DecodeVoucher(respBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode voucher from registrar: %w", err)
+	}
+
+	p.logger.Infof("Successfully received voucher from local registrar for serial number: %s", string(v.SerialNumber))
+	p.logger.Infof("Note: Registrar proxied this request to MASA and returned the response")
+	return v, nil
 }
 
-// requestVoucherFromMASA requests a voucher from the MASA
-func (p *MockPledge) requestVoucherFromMASA(masaURL, domainCert string) (*Voucher, error) {
-	// Create HTTP client that skips TLS verification for testing
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				Certificates: []tls.Certificate{
-					{
-						Certificate: [][]byte{p.cert.Raw},
-						PrivateKey:  p.privateKey,
-					},
-				},
-			},
-		},
-	}
-
-	// Create voucher request
-	voucherReq := VoucherRequest{
-		SerialNumber: p.serialNumber,
-		DomainCert:   domainCert,
-		Nonce:        fmt.Sprintf("nonce-%d", time.Now().Unix()),
-		Assertion:    "verified",
-	}
-
-	// Convert request to JSON
-	reqBody, err := json.Marshal(voucherReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal voucher request: %w", err)
-	}
-
-	// Send request to MASA
-	resp, err := client.Post(masaURL+"/.well-known/brski/requestvoucher", "application/json", bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to send voucher request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("MASA returned status: %d", resp.StatusCode)
-	}
-
-	// Parse response
-	var voucherResp VoucherResponse
-	if err := json.NewDecoder(resp.Body).Decode(&voucherResp); err != nil {
-		return nil, fmt.Errorf("failed to decode voucher response: %w", err)
-	}
-
-	return voucherResp.Voucher, nil
-}
-
-// enrollWithEST enrolls with the EST server
-func (p *MockPledge) enrollWithEST(estServerURL string) error {
-	// Create HTTP client with mTLS configuration
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				Certificates: []tls.Certificate{
-					{
-						Certificate: [][]byte{p.cert.Raw},
-						PrivateKey:  p.privateKey,
-					},
-				},
-			},
-		},
-	}
+// enrollWithEST enrolls with the local registrar using the EST client
+func (p *MockPledge) enrollWithEST() error {
+	ctx := context.Background()
 
 	// Generate CSR
 	csr, err := p.generateCSR()
@@ -381,31 +424,32 @@ func (p *MockPledge) enrollWithEST(estServerURL string) error {
 		return fmt.Errorf("failed to generate CSR: %w", err)
 	}
 
-	// Encode CSR in base64
-	csrBase64 := base64.StdEncoding.EncodeToString(csr)
-
-	// Note: EST expects PKCS#10 CSR in base64 format, not JSON
-
-	// Send enrollment request with proper EST headers
-	req, err := http.NewRequest("POST", estServerURL+"/.well-known/est/simpleenroll", bytes.NewReader([]byte(csrBase64)))
+	// Parse the CSR bytes into a CertificateRequest
+	certReq, err := x509.ParseCertificateRequest(csr)
 	if err != nil {
-		return fmt.Errorf("failed to create enrollment request: %w", err)
+		return fmt.Errorf("failed to parse CSR: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/pkcs10")
-	req.Header.Set("Content-Transfer-Encoding", "base64")
-
-	resp, err := client.Do(req)
+	// Use the EST client to enroll with the local registrar
+	// The pledge is air-gapped and can only reach the local registrar
+	cert, err := p.estClient.Enroll(ctx, certReq)
 	if err != nil {
-		return fmt.Errorf("failed to send enrollment request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("EST server returned status: %d", resp.StatusCode)
+		return fmt.Errorf("failed to enroll with local registrar: %w", err)
 	}
 
-	log.Printf("Successfully enrolled with EST server")
+	// Store the enrollment certificate
+	p.brskiState.EnrollmentCert = cert
+	p.brskiState.EnrollmentKey = p.privateKey
+
+	// Save the enrollment certificate to a file
+	certFile, err := os.Create("enrollment_cert.pem")
+	if err != nil {
+		p.logger.Errorf("Failed to create enrollment certificate file: %v", err)
+	}
+	defer certFile.Close()
+	certFile.Write(cert.Raw)
+
+	p.logger.Infof("Successfully enrolled with local registrar, received certificate for: %s", cert.Subject.CommonName)
 	return nil
 }
 
