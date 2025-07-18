@@ -1,0 +1,67 @@
+{
+    "ca": {
+        "backends": [
+            {
+                "aps": "default",
+                "certificates": "/home/ayham/repo/kritis3m_workspace/certificates/pki/intermediate/ca_chain.pem",
+                "private_key": "/home/ayham/repo/kritis3m_workspace/certificates/pki/intermediate/privateKey.pem",
+                "pkcs11_module": {
+                    "path": "/usr/lib/softhsm/libsofthsm2.so",
+                    "slot": 2,
+                    "pin": "9012"
+                }
+            }
+        ],
+        "default_backend": {
+            "certificates": "/home/ayham/repo/kritis3m_workspace/certificates/pki/intermediate/ca_chain.pem",
+            "private_key": "/home/ayham/repo/kritis3m_workspace/certificates/pki/intermediate/privateKey.pem",
+            "pkcs11_module": {
+                "path": "/usr/lib/softhsm/libsofthsm2.so",
+                "slot": 2,
+                "pin": "9012"
+            }
+        },
+        "validity": 365
+    },
+    "tls": {
+        "listen_address": ":8443",
+        "certificates": "/home/ayham/repo/kritis3m_workspace/certificates/test_certs/secp384/chain.pem",
+        "private_key": "/home/ayham/repo/kritis3m_workspace/certificates/test_certs/secp384/privateKey.pem",
+        "client_cas": [
+            "/home/ayham/repo/kritis3m_workspace/certificates/test_certs/secp384/root.pem",
+            "/home/ayham/repo/brski-est/certs/vendor.crt",
+            "/home/ayham/repo/brski-est/certs/pledge1.crt"
+        ],
+        "asl_endpoint": {
+            "mutual_authentication": true,
+            "ciphersuites": [
+                "TLS13-AES256-GCM-SHA384",
+                "TLS13-CHACHA20-POLY1305-SHA256"
+            ],
+            "keylog_file": "measurements/keylog.log"
+        },
+        "pkcs11_module": {
+            "path": "/home/ayham/repo/kritis3m_workspace/secure_element/smartcard_middleware.so",
+            "pin": ""
+        }
+    },
+    "brski": {
+        "domain_name": "example.com",
+        "masa_urls": {
+            "example.com": "https://localhost:8444"
+        },
+        "masa_certs": {
+            "example.com": [
+                "/home/ayham/repo/kritis3m_workspace/certificates/test_certs/masa_cert.pem"
+            ]
+        },
+        "voucher_cache_dir": "/tmp/vouchers",
+        "accepted_device_serial_numbers": []
+    },
+    "allowed_hosts": [
+        "*"
+    ],
+    "healthcheck_password": "xyzzy",
+    "rate_limit": 150,
+    "log_level": 3
+}

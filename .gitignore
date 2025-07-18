@@ -14,3 +14,6 @@ estclient
 
 # VS Code
 .vscode
+test.db
+test.db-shm
+test.db-wal

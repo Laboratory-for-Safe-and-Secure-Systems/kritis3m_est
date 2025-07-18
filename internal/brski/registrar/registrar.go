@@ -55,7 +55,7 @@ func NewRegistrar(config *types.RegistrarConfig, domainCA *x509.Certificate) (*R
 			return nil, fmt.Errorf("MASA certificate not found for domain: %s", domain)
 		}
 
-		masaClient, err := masa.NewClient(masaURL, masaCert[0], config.Logger)
+		masaClient, err := masa.NewClient(masaURL, masaCert, config.Logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create MASA client for domain %s: %w", domain, err)
 		}

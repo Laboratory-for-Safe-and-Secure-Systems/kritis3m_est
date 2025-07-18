@@ -44,7 +44,7 @@ type CA interface {
 	ServerKeyGen(ctx context.Context, csr *x509.CertificateRequest, aps string, r *http.Request) (*x509.Certificate, []byte, error)
 
 	// Revokation List
-	RevocationList(ctx context.Context, r *http.Request) ([]byte, error)
+	RevocationList(ctx context.Context, r *http.Request, abs string) ([]byte, error)
 }
 
 // BRSKIRegistrar extends the CA interface with BRSKI registrar functionality.

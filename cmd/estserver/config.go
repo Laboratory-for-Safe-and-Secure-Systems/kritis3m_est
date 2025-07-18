@@ -12,6 +12,7 @@ import (
 type config struct {
 	RealCA              *realCAConfig `json:"ca,omitempty"`
 	TLS                 *tlsConfig    `json:"tls,omitempty"`
+	BRSKI               *brskiConfig  `json:"brski,omitempty"`
 	AllowedHosts        []string      `json:"allowed_hosts,omitempty"`
 	HealthCheckPassword string        `json:"healthcheck_password"`
 	RateLimit           int           `json:"rate_limit"`
@@ -31,6 +32,16 @@ type realCAConfig struct {
 	Backends       []realca.PKIBackendConfig `json:"backends"`
 	DefaultBackend *realca.PKIBackendConfig  `json:"default_backend,omitempty"`
 	Validity       int                       `json:"validity,omitempty"`
+}
+
+// brskiConfig contains BRSKI configuration options
+type brskiConfig struct {
+	DomainName                  string              `json:"domain_name"`
+	MASAURLs                    map[string]string   `json:"masa_urls"`
+	MASACerts                   map[string][]string `json:"masa_certs"`
+	RequireVoucherVerification  bool                `json:"require_voucher_verification,omitempty"`
+	AcceptedDeviceSerialNumbers []string            `json:"accepted_device_serial_numbers,omitempty"`
+	VoucherCacheDir             string              `json:"voucher_cache_dir,omitempty"`
 }
 
 // tlsConfig contains the server's TLS configuration.
@@ -122,6 +133,19 @@ const sample = `{
             "slot": 0,
             "pin": "1234"
         }
+    },
+    "brski": {
+        "domain_name": "example.com",
+        "masa_urls": {
+            "example.com": "https://masa.example.com"
+        },
+        "masa_certs": {
+            "example.com": [
+                "/path/to/masa_cert.pem"
+            ]
+        },
+        "voucher_cache_dir": "/tmp/vouchers",
+        "accepted_device_serial_numbers": []
     },
     "allowed_hosts": [
         "localhost",

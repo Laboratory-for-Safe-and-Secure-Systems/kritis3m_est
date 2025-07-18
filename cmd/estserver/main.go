@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +17,7 @@ import (
 	aslListener "github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/listener"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/alogger"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/aslhttpserver"
+	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/brski/types"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/est"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/kritis3m_pki"
@@ -210,13 +212,51 @@ func main() {
 		log.Fatalf("No CA defined in configuration file")
 	}
 
+	// Add BRSKI support by wrapping the RealCA with a BRSKIAdapter
+	var finalCA est.CA = ca
+	if cfg.BRSKI != nil {
+		brskiConfig := &types.RegistrarConfig{
+			MASAURLs:                    make(map[string]*url.URL),
+			MASACerts:                   make(map[string][]string),
+			DomainName:                  cfg.BRSKI.DomainName,
+			RequireVoucherVerification:  cfg.BRSKI.RequireVoucherVerification,
+			AcceptedDeviceSerialNumbers: cfg.BRSKI.AcceptedDeviceSerialNumbers,
+			VoucherCacheDir:             cfg.BRSKI.VoucherCacheDir,
+			VoucherValidityPeriod:       24 * time.Hour,
+			Logger:                      logger,
+		}
+
+		// Parse MASA URLs from string to url.URL
+		for domain, urlStr := range cfg.BRSKI.MASAURLs {
+			masaURL, err := url.Parse(urlStr)
+			if err != nil {
+				log.Fatalf("invalid MASA URL for domain %s: %v", domain, err)
+			}
+			brskiConfig.MASAURLs[domain] = masaURL
+		}
+
+		// Set MASA certificates
+		for domain, certs := range cfg.BRSKI.MASACerts {
+			brskiConfig.MASACerts[domain] = certs
+		}
+
+		// Create a BRSKI adapter that wraps the RealCA
+		brskiAdapter, err := realca.NewBRSKIAdapter(ca, brskiConfig)
+		if err != nil {
+			log.Fatalf("failed to create BRSKI adapter: %v", err)
+		}
+
+		finalCA = brskiAdapter
+		logger.Infof("BRSKI configuration loaded for domain: %s", brskiConfig.DomainName)
+	}
+
 	// Create server TLS configuration. If a server TLS configuration was
 	// specified in the configuration file, use it.
 	var listenAddr = defaultListenAddr
 
 	// Create server mux.
 	r, err := est.NewRouter(&est.ServerConfig{
-		CA:           ca,
+		CA:           finalCA,
 		Logger:       logger,
 		AllowedHosts: cfg.AllowedHosts,
 		Timeout:      time.Duration(cfg.Timeout) * time.Second,

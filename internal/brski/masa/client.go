@@ -2,18 +2,17 @@ package masa
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl"
-	aslClient "github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/listener"
-	"github.com/Laboratory-for-Safe-and-Secure-Systems/go-asl/logging"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/brski/voucher"
 	"github.com/Laboratory-for-Safe-and-Secure-Systems/kritis3m_est/internal/common"
 )
@@ -28,67 +27,71 @@ type Client struct {
 
 	// Logger is the logger to use
 	Logger common.Logger
-
-	// Certificate settings for ASL
-	MASACertPath string
 }
 
-// NewClient creates a new MASA client with ASL support
-// The masaCert parameter is the path to the MASA's CA certificate
-func NewClient(baseURL *url.URL, masaCertPath string, logger common.Logger) (*Client, error) {
+// NewClient creates a new MASA client with standard TLS support
+// The masaCertPaths parameter is a slice of paths to the MASA's CA certificates
+func NewClient(baseURL *url.URL, masaCertPaths []string, logger common.Logger) (*Client, error) {
 	client := &Client{
-		BaseURL:      baseURL,
-		Logger:       logger,
-		MASACertPath: masaCertPath,
+		BaseURL: baseURL,
+		Logger:  logger,
 	}
 
-	// Create HTTP client with ASL transport
-	httpClient, err := client.initASLClient()
+	// Create HTTP client with TLS transport
+	httpClient, err := client.initTLSClient(masaCertPaths)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize ASL client: %w", err)
+		return nil, fmt.Errorf("failed to initialize TLS client: %w", err)
 	}
 	client.HTTPClient = httpClient
 
 	return client, nil
 }
 
-// initASLClient initializes an HTTP client with ASL transport for BRSKI communications
-func (c *Client) initASLClient() (*http.Client, error) {
-	// Per RFC 8995, section 5.1, the registrar acts as a client to the MASA
-	// and uses TLS to authenticate the MASA using the MASA's trust anchor
+// initTLSClient initializes an HTTP client with TLS transport for BRSKI communications
+func (c *Client) initTLSClient(masaCertPaths []string) (*http.Client, error) {
+	// Create a certificate pool for the MASA certificates
+	caCertPool := x509.NewCertPool()
 
-	// Create endpoint configuration for ASL
-	config := &asl.EndpointConfig{
-		// Per RFC 8995, mutual authentication is not required for the MASA client
-		// The registrar authenticates the MASA server, but the MASA doesn't need to authenticate the registrar
-		MutualAuthentication: false,
-		ASLKeyExchangeMethod: 0,
-		Ciphersuites:         []string{},
-		PreSharedKey: asl.PreSharedKey{
-			Enable: false,
-		},
-		// Include the MASA's CA certificate as the root certificate
-		RootCertificates: asl.RootCertificates{
-			Paths: []string{c.MASACertPath},
-		},
+	// Load MASA certificates
+	for _, certPath := range masaCertPaths {
+		if certPath == "" {
+			continue
+		}
+
+		certData, err := os.ReadFile(certPath)
+		if err != nil {
+			c.Logger.Infof("Failed to read MASA certificate %s: %v", certPath, err)
+			continue
+		}
+
+		if !caCertPool.AppendCertsFromPEM(certData) {
+			c.Logger.Infof("Failed to parse MASA certificate %s", certPath)
+		}
 	}
 
-	// Initialize ASL endpoint
-	endpoint := asl.ASLsetupClientEndpoint(config)
-	if endpoint == nil {
-		return nil, fmt.Errorf("failed to setup ASL endpoint")
+	// Create TLS configuration
+	tlsConfig := &tls.Config{
+		RootCAs:            caCertPool,
+		InsecureSkipVerify: len(masaCertPaths) == 0, // Skip verification if no certs provided
 	}
 
-	// Create ASL transport
-	aslTransport := &aslClient.ASLTransport{
-		Endpoint: endpoint,
-		Dialer:   &net.Dialer{Timeout: 30 * time.Second},
-		Logger:   logging.NewLogger(log.Default()),
+	// Create transport with TLS configuration
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	}
 
 	// Return configured HTTP client
 	return &http.Client{
-		Transport: aslTransport,
+		Transport: transport,
+		Timeout:   30 * time.Second,
 	}, nil
 }
 

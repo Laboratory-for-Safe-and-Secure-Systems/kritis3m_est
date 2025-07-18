@@ -225,6 +225,26 @@ func NewRouter(cfg *ServerConfig) (http.Handler, error) {
 		})
 	})
 
+	// BRSKI endpoints - only add if CA implements BRSKIRegistrar
+	if _, ok := cfg.CA.(BRSKIRegistrar); ok {
+		r.Route(brskiPrefix, func(r chi.Router) {
+			r.Post(requestVoucherEndpoint, requestVoucher)
+			r.Post(voucherStatusEndpoint, voucherStatus)
+			r.Get(registrarVoucherEndpoint, registrarVoucher)
+			r.Get(registrarVoucherStatusEndpoint, registrarVoucherStatus)
+			r.Get(requestAuditLogEndpoint, requestAuditLog)
+
+			// BRSKI endpoints with additional path segment
+			r.Route(fmt.Sprintf("/{%s}", apsParamName), func(r chi.Router) {
+				r.Post(requestVoucherEndpoint, requestVoucher)
+				r.Post(voucherStatusEndpoint, voucherStatus)
+				r.Get(registrarVoucherEndpoint, registrarVoucher)
+				r.Get(registrarVoucherStatusEndpoint, registrarVoucherStatus)
+				r.Get(requestAuditLogEndpoint, requestAuditLog)
+			})
+		})
+	}
+
 	return r, nil
 }
 
