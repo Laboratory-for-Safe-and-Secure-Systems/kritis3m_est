@@ -66,6 +66,9 @@ type BRSKIRegistrar interface {
 
 	// GetAuditLog retrieves the audit log for a device from the MASA.
 	GetAuditLog(ctx context.Context, serialNumber string, aps string, r *http.Request) ([]byte, error)
+
+	// RevocationList retrieves the revocation list for a device from the MASA.
+	RevocationList(ctx context.Context, r *http.Request, aps string) ([]byte, error)
 }
 
 // Error represents an error which can be translated into an HTTP
